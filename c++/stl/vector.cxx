@@ -25,7 +25,7 @@ struct President
 };
 
 // the emplace_back call helps us to avoid the additional copying/moving
-// operations thas are done in the push_back call
+// operations that have a place in the push_back call
 int main(int argc, char *argv[])
 {
 	std::vector<President> elections;
