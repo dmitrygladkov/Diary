@@ -13,7 +13,7 @@ LIBS =
 LD = $(CXX)
 LDFLAGS = $(CXXFLAGS)
 
-TESTS = lambda
+TESTS = lambda rvalue_move
 
 all: $(TESTS)
 
