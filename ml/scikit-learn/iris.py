@@ -1,5 +1,8 @@
 import numpy as np
 import urllib.request
+import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap
+#from sklearn import neighbors, datasets
 
 url = "https://archive.ics.uci.edu/ml/machine-learning-databases/iris/iris.data"
 
@@ -17,3 +20,5 @@ N, d = X.shape
 print(N, d) # Number of objects and number of features
 print(X)
 print(y)
+
+plt.figure()
