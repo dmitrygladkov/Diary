@@ -33,11 +33,11 @@ def splitTrainTest (data, testPercent):
 #Main classification procedure
 def classifyKNN(trainData, testData, k, numberOfClasses):
     #Euclidean distance between 2-dimensional point
-    def dist (a, b):
+    def dist(a, b):
         return math.sqrt((a[0] - b[0])**2 + (a[1] - b[1])**2)
     testLabels = []
     for testPoint in testData:
-        #Claculate distances between test point and all of the train points
+        #Calculate distances between test point and all of the train points
         testDist = [ [dist(testPoint, trainData[i][0]), trainData[i][1]] for i in range(len(trainData))]
         #How many points of each class among nearest K
         stat = [0 for i in range(numberOfClasses)]
