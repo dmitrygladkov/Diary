@@ -1,0 +1,11 @@
+errors/rma/winerr.c,,2
+errors/rma/winerr2.c,,2
+errors/rma/win_sync_unlock.c,,2
+errors/rma/win_sync_free_pt.c,,2
+errors/rma/win_sync_free_at.c,,2
+errors/rma/win_sync_complete.c.c,,2
+errors/rma/win_sync_lock_at.c,,2
+errors/rma/win_sync_lock_pt.c,,2
+errors/rma/win_sync_lock_fence.c,,2
+errors/rma/win_sync_nested.c,,2
+errors/rma/win_sync_op.c,,2
