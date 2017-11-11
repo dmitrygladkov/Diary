@@ -2,40 +2,72 @@
 #include <malloc.h>
 #include <stdlib.h>
 
-/* Prototypes for our hooks.  */
-static void my_init_hook(void);
-static void *my_malloc_hook(size_t, const void *);
-/* Variables to save original hooks. */
-static void *(*old_malloc_hook)(size_t, const void *);
-/* Override initializing hook from the C library. */
-void (*__malloc_initialize_hook) (void) = my_init_hook;
+typedef void *(*malloc_hook_func_t)(size_t, const void *);
 
-static void my_init_hook(void)
-{
-	old_malloc_hook = __malloc_hook;
-	__malloc_hook = my_malloc_hook;
-}
-static void *my_malloc_hook(size_t size, const void *caller)
+static struct memory_hook_entry {
+	malloc_hook_func_t old_hook;
+} memory_hooks[2];
+
+static void *malloc_hook1(size_t size, const void *caller)
 {
 	void *result;
 	/* Restore all old hooks */
-	__malloc_hook = old_malloc_hook;
+	__malloc_hook = memory_hooks[0].old_hook;
 	/* Call recursively */
 	result = malloc(size);
-	/* Save underlying hooks */
-	old_malloc_hook = __malloc_hook;
+	__malloc_hook = malloc_hook1;
+
+
+	__malloc_hook = memory_hooks[0].old_hook;
 	/* printf() might call malloc(), so protect it too. */
-	printf("malloc(%u) called from %p returns %p\n",
+	printf("malloc_hook1: malloc(%u) called from %p returns %p\n",
 	       (unsigned int)size, caller, result);
 	/* Restore our own hooks */
-	__malloc_hook = my_malloc_hook;
+	__malloc_hook = malloc_hook1;
 
 	return result;
 }
 
+static void *malloc_hook2(size_t size, const void *caller)
+{
+	void *result;
+	/* Restore all old hooks */
+	__malloc_hook = memory_hooks[1].old_hook;
+	/* Call recursively */
+	result = malloc(size);
+	__malloc_hook = malloc_hook2;
+
+
+	__malloc_hook = memory_hooks[1].old_hook;
+	/* printf() might call malloc(), so protect it too. */
+	printf("malloc_hook2: malloc(%u) called from %p returns %p\n",
+	       (unsigned int)size, caller, result);
+	/* Restore our own hooks */
+	__malloc_hook = malloc_hook2;
+
+	return result;
+}
+
+static void install_malloc_hook(struct memory_hook_entry *entry,
+				malloc_hook_func_t new_hook)
+{
+	entry->old_hook = __malloc_hook;
+	__malloc_hook = new_hook;
+}
+
+#ifndef count_of
+#define count_of	\
+	((sizeof(x)/sizeof(0[x])) / ((size_t)(!(sizeof(x) % sizeof(0[x])))))
+#endif
+
 int main(int argc, char **argv)
 {
-	void *str = malloc(1024);
+	void *str;
+
+	install_malloc_hook(&memory_hooks[0], malloc_hook1);
+	install_malloc_hook(&memory_hooks[1], malloc_hook2);
+
+	str = malloc(1024);
 	if (!str) {
 		printf("Test didn't pass !!! \n");
 		return EXIT_FAILURE;
