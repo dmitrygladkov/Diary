@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -g -O3 -std=c++11
+CXXFLAGS = -g -std=c++11
 LIBS =
 
 #CXX = clang++ #-v
