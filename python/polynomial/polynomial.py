@@ -20,9 +20,10 @@ class Polynomial:
             self.coeffs.append(float(_coeffs))
         elif (type(_coeffs) is list) or (type(_coeffs) is tuple):
             self.parse_list_coeffs(_coeffs)
+        elif (isinstance(_coeffs, Polynomial)):
+            self.coeffs.extend(_coeffs.coeffs)
         else:
             raise ValueError("Error! Unknown type of coefficients - " + type(coeffs))
-        print(self.coeffs)
 
     def polynomial_to_string(self, var_string = 'x', fraction = 2):
         res_str = ''
@@ -41,10 +42,12 @@ class Polynomial:
 
                 if (coeff == 1) and (power != 0):
                     str_coeff = ''
+                elif (coeff == 0) and (power == 0):
+                    str_coeff = '0'
                 else:
                     int_str = str(str(coeff).split('.')[0])
-                    frac_str = str(int(str(coeff).split('.')[1]) % 10 ** fraction)
-                    str_coeff = int_str + '.' + frac_str
+                    frac_str = str(str(coeff % float(int_str)).split('.')[1])
+                    str_coeff = int_str + ('' if frac_str == '0' else ('.' + frac_str))
 
                 if power == 0:
                     str_power = ''
@@ -54,6 +57,8 @@ class Polynomial:
                     str_power = var_string + '^' + str(power)
 
                 res_str += sign + str_coeff + str_power
+            elif (power == 0) and (first_pow == 0):
+                res_str = '0'
         return res_str
 
     def __str__(self):
@@ -63,6 +68,7 @@ class Polynomial:
         return len(self.coeffs)
 
     def __eq__(self, other):
+        other = Polynomial(other)
         if len(self) != len(other):
             return False
         for i, j in zip(self.coeffs, other.coeffs):
@@ -70,8 +76,85 @@ class Polynomial:
                 return False
         return True
 
-    
+    def __ne__(self, other):
+        other = Polynomial(other)
+        return False if self.__eq__(other) == True else True
+
+    def extend_coeffs(self, other):
+        if len(self) < len(other):
+            self.coeffs.reverse()
+            self.coeffs.extend([0] * (len(other) - len(self)))
+            self.coeffs.reverse()
+        else:
+            other.coeffs.reverse()
+            other.coeffs.extend([0] * (len(self) - len(other)))
+            other.coeffs.reverse()
+
+    # Add operation
+    def __iadd__(self, other):
+        other = Polynomial(other)
+        result_len = max(len(self) , len(other))
+        self.extend_coeffs(other)
+        for it in range(0, result_len):
+            self.coeffs[it] += other.coeffs[it]
+        return self
+
+    def __add__(self, other):
+        other = Polynomial(other)
+        res = Polynomial(self.coeffs)
+        res += other
+        return res
+
+    def __radd__(self, other):
+        other = Polynomial(other)
+        res = Polynomial(self.coeffs)
+        other += res
+        return other
+
+    # Sub operation
+    def __isub__(self, other):
+        other = Polynomial(other)
+        result_len = max(len(self) , len(other))
+        self.extend_coeffs(other)
+        for it in range(0, result_len):
+            self.coeffs[it] -= other.coeffs[it]
+        return self
+
+    def __sub__(self, other):
+        other = Polynomial(other)
+        res = Polynomial(self.coeffs)
+        res -= other
+        return res
+
+    def __rsub__(self, other):
+        other = Polynomial(other.coeffs)
+        res = Polynomial(self.coeffs)
+        other -= res
+        return other
+
+    # Mul operatiuon
+    def __imul__(self, other):
+        other = Polynomial(other)
+        res = Polynomial([0]*(len(other)+len(self)-1))
+        for i1, val1 in enumerate(self.coeffs):
+            for i2, val2 in enumerate(other.coeffs):
+                res.coeffs[i1 + i2] += val1 * val2
+        self.coeffs = []
+        for it in res.coeffs:
+            self.coeffs.append(it)
+        return self
+
+    def __mul__(self, other):
+        other = Polynomial(other)
+        res = Polynomial(self.coeffs)
+        res *= other
+        return res
+
+    def __rmul__(self, other):
+        other = Polynomial(other)
+        res = Polynomial(self.coeffs)
+        other *= res
+        return other
 
 if __name__ == "__main__":
     print("Main")
-    print(Polynomial([2.2349, 0, -1, 3]) == Polynomial([2.2349, 0, 1, 3]))
