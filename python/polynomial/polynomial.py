@@ -26,6 +26,9 @@ class Polynomial:
             raise ValueError("Error! Unknown type of coefficients - " + type(coeffs))
 
     def polynomial_to_string(self, var_string = 'x', fraction = 2):
+	if all(coeff == 0 for coeff in self.coeffs):
+            return '0'
+
         res_str = ''
         first_pow = len(self) - 1
 
@@ -57,8 +60,6 @@ class Polynomial:
                     str_power = var_string + '^' + str(power)
 
                 res_str += sign + str_coeff + str_power
-            elif (power == 0) and (first_pow == 0):
-                res_str = '0'
         return res_str
 
     def __str__(self):
