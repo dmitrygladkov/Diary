@@ -18,15 +18,15 @@ class Polynomial:
             self.parse_string_coeffs(_coeffs)
         elif (type(_coeffs) is int) or (type(_coeffs) is float):
             self.coeffs.append(float(_coeffs))
-        elif (type(_coeffs) is list) or (type(_coeffs) is tuple):
+        elif (type(_coeffs) is list) or (type(_coeffs) is tuple) or (type(_coeffs) is range):
             self.parse_list_coeffs(_coeffs)
         elif (isinstance(_coeffs, Polynomial)):
             self.coeffs.extend(_coeffs.coeffs)
         else:
-            raise ValueError("Error! Unknown type of coefficients - " + type(coeffs))
+            raise ValueError("Error! Unknown type of coefficients - " + str(type(_coeffs)))
 
     def polynomial_to_string(self, var_string = 'x', fraction = 2):
-	if all(coeff == 0 for coeff in self.coeffs):
+        if all(coeff == 0 for coeff in self.coeffs):
             return '0'
 
         res_str = ''
@@ -49,7 +49,7 @@ class Polynomial:
                     str_coeff = '0'
                 else:
                     int_str = str(str(coeff).split('.')[0])
-                    frac_str = str(str(coeff % float(int_str)).split('.')[1])
+                    frac_str = str(str(coeff - (int(coeff) % int(int_str))).split('.')[1])
                     str_coeff = int_str + ('' if frac_str == '0' else ('.' + frac_str))
 
                 if power == 0:
