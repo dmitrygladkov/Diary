@@ -70,9 +70,10 @@ class Polynomial:
 
     def __eq__(self, other):
         other = Polynomial(other)
-        if len(self) != len(other):
-            return False
-        for i, j in zip(self.coeffs, other.coeffs):
+        this = Polynomial(self.coeffs)
+        this.extend_coeffs(other)
+
+        for i, j in zip(this.coeffs, other.coeffs):
             if i != j:
                 return False
         return True
