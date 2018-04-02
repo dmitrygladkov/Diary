@@ -82,6 +82,16 @@ class TestPolynomial(unittest.TestCase):
         self.pm2 = pm.Polynomial("1")
         self.assertTrue(self.pm1 == self.pm2, "Error! Polynomials aren't equal")
 
+    def test_method__eq__different_amount_0(self):
+        self.pm1 = pm.Polynomial([0])
+        self.pm2 = pm.Polynomial([0 ,0])
+        self.assertTrue(self.pm1 == self.pm2, "Error! Polynomials aren't equal")
+
+    def test_method__eq__different_amount_num(self):
+        self.pm1 = pm.Polynomial([1])
+        self.pm2 = pm.Polynomial([0 ,1])
+        self.assertTrue(self.pm1 == self.pm2, "Error! Polynomials aren't equal")
+
     # __ne__
     def test_method__ne__long_false(self):
         self.pm1 = pm.Polynomial(range(10))
@@ -119,6 +129,11 @@ class TestPolynomial(unittest.TestCase):
         self.pm1 = pm.Polynomial([1])
         self.pm2 = pm.Polynomial("1")
         self.assertFalse(self.pm1 != self.pm2, "Error! Polynomials aren't equal")
+
+    def test_method__ne__different_amount_num(self):
+        self.pm1 = pm.Polynomial([1])
+        self.pm2 = pm.Polynomial([1 ,1])
+        self.assertTrue(self.pm1 != self.pm2, "Error! Polynomials are equal")
 
     #__iadd__
     def test_method__iadd__single_val(self):
