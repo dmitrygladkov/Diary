@@ -124,6 +124,13 @@ void Matrix<T>::generate_sym_pos_def_matrix_method2(void)
 template <typename T>
 void Matrix<T>::matrix_multiplication(T *res_matrix, T *left_matrix, T *right_matrix, int dim)
 {
+	Matrix_Multiplication(res_matrix, left_matrix, right_matrix, dim);
+}
+
+template <typename T>
+static inline
+void Matrix_Multiplication(T *res_matrix, T *left_matrix, T *right_matrix, int dim)
+{
 	size_t i, j, k;
 
 	for (i = 0; i < dim; i++) {
@@ -131,15 +138,23 @@ void Matrix<T>::matrix_multiplication(T *res_matrix, T *left_matrix, T *right_ma
 			MATRIX(res_matrix, i, j, dim) = 0;
 			for (k = 0; k < dim; k++)
 				MATRIX(res_matrix, i, j, dim) +=
-					(MATRIX(left_matrix, i, k, dim) * MATRIX(right_matrix, k, j, dim));
+				(MATRIX(left_matrix, i, k, dim) * MATRIX(right_matrix, k, j, dim));
 		}
 	}
 }
 
 template <typename T>
-void Matrix<T>::matrix_transposition(T *matrix, size_t dim) {
+void Matrix<T>::matrix_transposition(T *matrix, size_t dim)
+{
+	Matrix_Transposition(matrix, dim);
+}
+
+template <typename T>
+static inline
+void Matrix_Transposition(T *matrix, size_t dim)
+{
 	size_t i, j;
-	T tmp = 0;
+	T tmp;
 
 	for (i = 0; i < dim; i++) {
 		for (j = i; j < dim; j++) {
@@ -233,6 +248,7 @@ int Matrix<T>::check_sym_pos_def_matrix(void)
 	return 0;
 }
 
+static inline
 void Cholesky_Decomposition_line(double *A, double *L, int n)
 {
 	double sum = 0;
