@@ -3,6 +3,8 @@
 #include <random>
 #include <math.h>
 #include <ctime>
+#include <algorithm>
+#include <iterator>
 
 using namespace std;
 
@@ -62,7 +64,16 @@ private:
 	void generate_sym_pos_def_matrix_method2(void);
 	int check_sym_pos_def_matrix(void);
 	void matrix_transposition(T *matrix, size_t dim);
-	void matrix_multiplication(T *res_matrix, T *left_matrix, T *right_matrix, int dim);
+	void matrix_multiplication(T *res_matrix, T *left_matrix, T *right_matrix, size_t dim);
+	void matrix_subtraction(T *res_matrix, T *left_matrix, T *right_matrix, size_t dim);
+	void matrix_addition(T *res_matrix, T *left_matrix, T *right_matrix, size_t dim);
+	void copy_from(T *matrix, size_t dim)
+	{
+		for (size_t i = 0; i < dim; i++) {
+			for (size_t j = 0; j < dim; j++)
+				MATRIX(array, i, j, dimension) = matrix[i][j] = matrix[i][j];
+		}
+	}
 	void get_cofactor(T **mat, T **temp, size_t p, size_t q, size_t n);
 	T determinant_matrix(T **mat, size_t n);
 	friend ostream& operator<<(ostream& os, const Matrix& obj)
@@ -122,21 +133,20 @@ void Matrix<T>::generate_sym_pos_def_matrix_method2(void)
 }
 
 template <typename T>
-void Matrix<T>::matrix_multiplication(T *res_matrix, T *left_matrix, T *right_matrix, int dim)
+void Matrix<T>::matrix_multiplication(T *res_matrix, T *left_matrix, T *right_matrix, size_t dim)
 {
 	Matrix_Multiplication(res_matrix, left_matrix, right_matrix, dim);
+	copy_from(matrix.dim);
 }
 
 template <typename T>
 static inline
 void Matrix_Multiplication(T *res_matrix, T *left_matrix, T *right_matrix, int dim)
 {
-	size_t i, j, k;
-
-	for (i = 0; i < dim; i++) {
-		for (j = 0; j < dim; j++) {
+	for (size_t i = 0; i < dim; i++) {
+		for (size_t j = 0; j < dim; j++) {
 			MATRIX(res_matrix, i, j, dim) = 0;
-			for (k = 0; k < dim; k++)
+			for (size_t k = 0; k < dim; k++)
 				MATRIX(res_matrix, i, j, dim) +=
 				(MATRIX(left_matrix, i, k, dim) * MATRIX(right_matrix, k, j, dim));
 		}
@@ -147,6 +157,7 @@ template <typename T>
 void Matrix<T>::matrix_transposition(T *matrix, size_t dim)
 {
 	Matrix_Transposition(matrix, dim);
+	copy_from(matrix.dim);
 }
 
 template <typename T>
@@ -156,15 +167,76 @@ void Matrix_Transposition(T *matrix, size_t dim)
 	size_t i, j;
 	T tmp;
 
-	for (i = 0; i < dim; i++) {
-		for (j = i; j < dim; j++) {
-			if (i != j) {
-				tmp = MATRIX(matrix, i, j, dim);
-				MATRIX(matrix, i, j, dim) = MATRIX(matrix, j, i, dim);
-				MATRIX(matrix, j, i, dim) = tmp;
-			}
-
+	for (size_t i = 0; i < dim; i++) {
+		for (size_t j = i + 1; j < dim; j++) {
+			tmp = MATRIX(matrix, i, j, dim);
+			MATRIX(matrix, i, j, dim) = MATRIX(matrix, j, i, dim);
+			MATRIX(matrix, j, i, dim) = tmp;
 		}
+	}
+}
+
+template <typename T>
+void Matrix<T>::matrix_subtraction(T *res_matrix, T *left_matrix, T *right_matrix, size_t dim)
+{
+	Matrix_Subtraction(res_matrix, left_matrix, right_matrix, dim);
+	copy_from(matrix.dim);
+}
+
+template <typename T>
+static inline
+void Matrix_Subtraction(T *matrix_res, T *matrix_left, T *matrix_right, size_t dim)
+{
+	for (size_t i = 0; i < dim; i++) {
+		for (size_t j = 0; j < dim; j++) {
+			MATRIX(matrix_res, i, j, dim) =
+				MATRIX(matrix_left, i, j, dim) - MATRIX(matrix_right, i, j, dim);
+		}
+	}
+}
+
+template <typename T>
+void Matrix<T>::matrix_addition(T *res_matrix, T *left_matrix, T *right_matrix, size_t dim)
+{
+	Matrix_Addition(res_matrix, left_matrix, right_matrix, dim);
+	copy_from(matrix.dim);
+}
+
+template <typename T>
+static inline
+void Matrix_Addition(T *matrix_res, T *matrix_left, T *matrix_right, size_t dim)
+{
+	for (size_t i = 0; i < dim; i++) {
+		for (size_t j = 0; j < dim; j++) {
+			MATRIX(matrix_res, i, j, dim) =
+				MATRIX(matrix_left, i, j, dim) + MATRIX(matrix_right, i, j, dim);
+		}
+	}
+}
+
+template <typename T>
+static inline
+void solve_lower_triangular_matrix(size_t dim, T *a, T *b, T *x) {
+	T s;
+
+	for (size_t i = 0; i < dim; i++) {
+		s = 0;
+		for (size_t j = 0; j < i; j++)
+			s += MATRIX(a, i, j, dim) * x[j];
+		x[i] = (b[i] - s) / MATRIX(a, i, i, dim);
+	}
+}
+
+template <typename T>
+static inline
+void solve_higher_triangular_matrix(size_t dim, T *a, T *b, T *x) {
+	T s;
+
+	for (int64_t i = dim - 1; i >= 0; i--) {
+		s = 0;
+		for (int64_t j = dim - 1; j > i; j--)
+			s += MATRIX(a, i, j, dim) * x[j];
+		x[i] = (b[i] - s) / MATRIX(a, i, i, dim);
 	}
 }
 
@@ -267,7 +339,7 @@ void Cholesky_Decomposition_line(double *A, double *L, int n)
 
 int main(char **argv, int argc)
 {
-	Matrix<double> matrix_obj(5), matrix_res(5);
+	/*Matrix<double> matrix_obj(5), matrix_res(5);
 	size_t dim = matrix_obj.get_dimension();
 	double *matrix = matrix_obj.get_1d_array();
 	double *result = new double[dim * dim];
@@ -281,5 +353,15 @@ int main(char **argv, int argc)
 	cout << matrix_res << endl;
 	getchar();
 
-	delete[] result;
+	delete[] result;*/
+
+	int n = 4;
+	double a[16] = { 1, -2, 6, 2, 0, 3, -2, -1, 0, 0, -1, 1,  0, 0, 0 ,3 };
+	double b[] = { 2, 4, 6, 5 };
+	double res[4];
+	solve_higher_triangular_matrix(n, a, b, res);
+
+	std::copy(res, res + 4, std::ostream_iterator<float>(std::cout, ","));
+
+	getchar();
 }
