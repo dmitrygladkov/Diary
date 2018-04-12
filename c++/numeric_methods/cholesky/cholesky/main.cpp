@@ -5,6 +5,7 @@
 #include <ctime>
 #include <algorithm>
 #include <iterator>
+#include <cassert>
 
 using namespace std;
 
@@ -167,7 +168,6 @@ template <typename T>
 static inline
 void Matrix_Transposition(T *matrix, size_t dim)
 {
-	size_t i, j;
 	T tmp;
 
 	for (size_t i = 0; i < dim; i++) {
@@ -376,7 +376,7 @@ T determinant_matrix(T *mat, size_t n)
 template <typename T>
 static inline void adjoint_matrix(T *A, T *adj, size_t dim)
 {
-	if (N == 1) {
+	if (dim == 1) {
 		MATRIX(adj, 0, 0, dim) = 1;
 		return;
 	}
@@ -388,7 +388,7 @@ static inline void adjoint_matrix(T *A, T *adj, size_t dim)
 	for (size_t i = 0; i < dim; i++) {
 		for (size_t j = 0; j < dim; j++) {
 			// Get cofactor of A[i][j]
-			get_cofactor_matrix(A, temp, i, j, N);
+			get_cofactor_matrix(A, temp, i, j, dim);
 
 			// sign of adj[j][i] positive if sum of row
 			// and column indexes is even.
@@ -396,7 +396,7 @@ static inline void adjoint_matrix(T *A, T *adj, size_t dim)
 
 			// Interchanging rows and columns to get the
 			// transpose of the cofactor matrix
-			MATRIX(adj, j, i, dim) = (sign)*(determinant_matrix(temp, N - 1));
+			MATRIX(adj, j, i, dim) = (sign)*(determinant_matrix(temp, dim - 1));
 		}
 	}
 }
@@ -407,7 +407,7 @@ template <typename T>
 static inline bool inverse_matrix(T *A, T *inverse, size_t dim)
 {
 	// Find determinant of A[][]
-	T det = determinant_matrix(A, N);
+	T det = determinant_matrix(A, dim);
 	if (det == 0) {
 		cout << "Singular matrix, can't find its inverse";
 		return false;
@@ -415,7 +415,7 @@ static inline bool inverse_matrix(T *A, T *inverse, size_t dim)
 
 	// Find adjoint
 	T * adj = new T[dim*dim];;
-	adjoint_matrix(A, adj);
+	adjoint_matrix(A, adj, dim);
 
 	// Find Inverse using formula "inverse(A) = adj(A)/det(A)"
 	for (size_t i = 0; i < dim; i++)
@@ -446,6 +446,25 @@ int Matrix<T>::check_sym_pos_def_matrix(void)
 			return 1;
 	}
 	return 0;
+}
+
+// L21 * L11T = A21
+//	||
+//	\/
+// L11T * L21 = L11T * A21 * L11T_inverse
+static inline
+void Cholesky_Solve_Second_Iteration(double *A21, double *L11, double *L21, int n)
+{
+	double *L11T = new double[n * n], *L11T_inverse = new double[n * n],
+		*L11T_A21_res = new double[n * n], *L11T_A21_L11T_inverse_res = new double[n * n];
+	memcpy(L11T, L11, sizeof(double) * n *n);
+	Matrix_Transposition(L11T, n);
+	bool res = inverse_matrix(L11T, L11T_inverse, n);
+	assert(res);
+	Matrix_Multiplication(L11T_A21_res, L11T, A21, n); // L11T * A21
+	Matrix_Multiplication(L11T_A21_L11T_inverse_res, L11T_A21_res, L11T_inverse, n); // L11T * A21 * L11T_inverse
+
+	solve_higher_triangular_matrix_system(n, n, L11T, L11T_A21_L11T_inverse_res, L21);
 }
 
 static inline
@@ -487,10 +506,10 @@ int main(char **argv, int argc)
 	double a[16] =
 		{ 1, -2, 6, 2, 0, 3, -2, -1, 0, 0, -1, 1,  0, 0, 0 ,3 };
 	double b[] =
-		{ 2, 4, 6, 5 , 2, 4, 6, 5 , 2, 4, 6, 5 , 2, 4, 6, 5 };
+		{ 2, 4, 6, 5 , 1, 3, 7, 8 , 1, 11, 61, 51 , -1, 2, 3, 4 };
 	double res[16];
 
-	solve_higher_triangular_matrix_system(4, n, a, b, res);
+	Cholesky_Solve_Second_Iteration(a, b, res, n);
 
 	std::copy(res, res + 16, std::ostream_iterator<float>(std::cout, ","));
 
