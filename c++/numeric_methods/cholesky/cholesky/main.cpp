@@ -11,6 +11,9 @@ using namespace std;
 #define MATRIX(array, i, j, dim)	\
 	(*((array) + (j) + (i) * (dim)))
 
+#define SYSTEM(system, i, dim)		\
+	((system) + (i) * (dim))
+
 template <typename T>
 class Matrix {
 public:
@@ -75,7 +78,7 @@ private:
 		}
 	}
 	void get_cofactor(T **mat, T **temp, size_t p, size_t q, size_t n);
-	T determinant_matrix(T **mat, size_t n);
+	T determinant(T **mat, size_t n);
 	friend ostream& operator<<(ostream& os, const Matrix& obj)
 	{
 		for (size_t i = 0; i < obj.dimension; i++) {
@@ -216,7 +219,8 @@ void Matrix_Addition(T *matrix_res, T *matrix_left, T *matrix_right, size_t dim)
 
 template <typename T>
 static inline
-void solve_lower_triangular_matrix(size_t dim, T *a, T *b, T *x) {
+void solve_lower_triangular_matrix(size_t dim, T *a, T *b, T *x)
+{
 	T s;
 
 	for (size_t i = 0; i < dim; i++) {
@@ -229,7 +233,8 @@ void solve_lower_triangular_matrix(size_t dim, T *a, T *b, T *x) {
 
 template <typename T>
 static inline
-void solve_higher_triangular_matrix(size_t dim, T *a, T *b, T *x) {
+void solve_higher_triangular_matrix(size_t dim, T *a, T *b, T *x)
+{
 	T s;
 
 	for (int64_t i = dim - 1; i >= 0; i--) {
@@ -238,6 +243,22 @@ void solve_higher_triangular_matrix(size_t dim, T *a, T *b, T *x) {
 			s += MATRIX(a, i, j, dim) * x[j];
 		x[i] = (b[i] - s) / MATRIX(a, i, i, dim);
 	}
+}
+
+template <typename T>
+static inline
+void solve_lower_triangular_matrix_system(size_t system_num, size_t dim, T *a, T *b_system, T *x_system)
+{
+	for (int64_t i = 0; i < system_num; i++)
+		solve_lower_triangular_matrix(dim, a, SYSTEM(b_system, i, system_num), SYSTEM(x_system, i, system_num));
+}
+
+template <typename T>
+static inline
+void solve_higher_triangular_matrix_system(size_t system_num, size_t dim, T *a, T *b_system, T *x_system)
+{
+	for (int64_t i = 0; i < system_num; i++)
+		solve_higher_triangular_matrix(dim, a, SYSTEM(b_system, i, system_num), SYSTEM(x_system, i, system_num));
 }
 
 // Function to get cofactor of mat[p][q] in temp[][]. n is current
@@ -266,10 +287,35 @@ void Matrix<T>::get_cofactor(T **mat, T **temp, size_t p, size_t q, size_t n)
 	}
 }
 
+template <typename T>
+static inline
+void get_cofactor_matrix(T *mat, T *temp, size_t p, size_t q, size_t n)
+{
+	size_t i = 0, j = 0;
+
+	// Looping for each element of the matrix
+	for (size_t row = 0; row < n; row++) {
+		for (size_t col = 0; col < n; col++) {
+			//  Copying into temporary matrix only those element
+			//  which are not in given row and column
+			if (row != p && col != q) {
+				MATRIX(temp, i, j++, n) = MATRIX(mat, row, col, n);
+
+				// Row is filled, so increase row index and
+				// reset col index
+				if (j == n - 1) {
+					j = 0;
+					i++;
+				}
+			}
+		}
+	}
+}
+
 /* Recursive function for finding determinant of matrix.
 n is current dimension of mat[][]. */
 template <typename T>
-T Matrix<T>::determinant_matrix(T **mat, size_t n)
+T Matrix<T>::determinant(T **mat, size_t n)
 {
 	T D = 0; // Initialize result
 
@@ -288,13 +334,95 @@ T Matrix<T>::determinant_matrix(T **mat, size_t n)
 	for (size_t f = 0; f < n; f++) {
 		// Getting Cofactor of mat[0][f]
 		get_cofactor(mat, temp, 0, f, n);
-		D += sign * mat[0][f] * determinant_matrix(temp, n - 1);
+		D += sign * mat[0][f] * determinant(temp, n - 1);
 
 		// terms are to be added with alternate sign
 		sign = -sign;
 	}
 
 	return D;
+}
+
+template <typename T>
+static inline
+T determinant_matrix(T *mat, size_t n)
+{
+	T D = 0; // Initialize result
+
+		 //  Base case : if matrix contains single element
+	if (n == 1)
+		return MATRIX(mat, 0, 0, n);
+
+	// To store cofactors
+	T *temp = new T[n*n];
+
+	int sign = 1; // To store sign multiplier
+
+		      // Iterate for each element of first row
+	for (size_t f = 0; f < n; f++) {
+		// Getting Cofactor of mat[0][f]
+		get_cofactor_matrix(mat, temp, 0, f, n);
+		D += sign * MATRIX(mat, 0, f, n) * determinant_matrix(temp, n - 1);
+
+		// terms are to be added with alternate sign
+		sign = -sign;
+	}
+
+	delete[] temp;
+	return D;
+}
+
+// Function to get adjoint of A[N][N] in adj[N][N].
+template <typename T>
+static inline void adjoint_matrix(T *A, T *adj, size_t dim)
+{
+	if (N == 1) {
+		MATRIX(adj, 0, 0, dim) = 1;
+		return;
+	}
+
+	// temp is used to store cofactors of A[][]
+	int sign = 1;
+	T *temp = new T[dim*dim];
+
+	for (size_t i = 0; i < dim; i++) {
+		for (size_t j = 0; j < dim; j++) {
+			// Get cofactor of A[i][j]
+			get_cofactor_matrix(A, temp, i, j, N);
+
+			// sign of adj[j][i] positive if sum of row
+			// and column indexes is even.
+			sign = ((i + j) % 2 == 0) ? 1 : -1;
+
+			// Interchanging rows and columns to get the
+			// transpose of the cofactor matrix
+			MATRIX(adj, j, i, dim) = (sign)*(determinant_matrix(temp, N - 1));
+		}
+	}
+}
+
+// Function to calculate and store inverse, returns false if
+// matrix is singular
+template <typename T>
+static inline bool inverse_matrix(T *A, T *inverse, size_t dim)
+{
+	// Find determinant of A[][]
+	T det = determinant_matrix(A, N);
+	if (det == 0) {
+		cout << "Singular matrix, can't find its inverse";
+		return false;
+	}
+
+	// Find adjoint
+	T * adj = new T[dim*dim];;
+	adjoint_matrix(A, adj);
+
+	// Find Inverse using formula "inverse(A) = adj(A)/det(A)"
+	for (size_t i = 0; i < dim; i++)
+		for (size_t j = 0; j < dim; j++)
+			MATRIX(inverse, i, j, dim) = MATRIX(adj, i, j, dim) / det;
+
+	return true;
 }
 
 template <typename T>
@@ -314,7 +442,7 @@ int Matrix<T>::check_sym_pos_def_matrix(void)
 		if ((gen_method == 1) && (matrix[i][i] != sum))
 			return 1;
 		// Check for postive definite
-		if (determinant_matrix(matrix, i + 1) <= 0)
+		if (determinant(matrix, i + 1) <= 0)
 			return 1;
 	}
 	return 0;
@@ -356,12 +484,15 @@ int main(char **argv, int argc)
 	delete[] result;*/
 
 	int n = 4;
-	double a[16] = { 1, -2, 6, 2, 0, 3, -2, -1, 0, 0, -1, 1,  0, 0, 0 ,3 };
-	double b[] = { 2, 4, 6, 5 };
-	double res[4];
-	solve_higher_triangular_matrix(n, a, b, res);
+	double a[16] =
+		{ 1, -2, 6, 2, 0, 3, -2, -1, 0, 0, -1, 1,  0, 0, 0 ,3 };
+	double b[] =
+		{ 2, 4, 6, 5 , 2, 4, 6, 5 , 2, 4, 6, 5 , 2, 4, 6, 5 };
+	double res[16];
 
-	std::copy(res, res + 4, std::ostream_iterator<float>(std::cout, ","));
+	solve_higher_triangular_matrix_system(4, n, a, b, res);
+
+	std::copy(res, res + 16, std::ostream_iterator<float>(std::cout, ","));
 
 	getchar();
 }
