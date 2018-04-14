@@ -609,7 +609,7 @@ void Cholesky_Decomposition(double *A, double *L, int n)
 		l++;
 	}
 
-	delete[] L22_red;
+	delete[] L22_red, A22_red;
 }
 
 int main(char **argv, int argc)
