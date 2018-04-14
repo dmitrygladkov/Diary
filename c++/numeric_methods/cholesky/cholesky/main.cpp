@@ -71,11 +71,12 @@ private:
 	void matrix_multiplication(T *res_matrix, T *left_matrix, T *right_matrix, size_t dim);
 	void matrix_subtraction(T *res_matrix, T *left_matrix, T *right_matrix, size_t dim);
 	void matrix_addition(T *res_matrix, T *left_matrix, T *right_matrix, size_t dim);
-	void copy_from(T *matrix, size_t dim)
+	inline void copy_from(T *matrix, size_t dim)
 	{
+		T *arr = array;
 		for (size_t i = 0; i < dim; i++) {
 			for (size_t j = 0; j < dim; j++)
-				MATRIX(array, i, j, dimension) = matrix[i][j] = matrix[i][j];
+				MATRIX(arr, i, j, dim) = this->matrix[i][j] = MATRIX(matrix, i, j, dim);
 		}
 	}
 	void get_cofactor(T **mat, T **temp, size_t p, size_t q, size_t n);
@@ -140,7 +141,7 @@ template <typename T>
 void Matrix<T>::matrix_multiplication(T *res_matrix, T *left_matrix, T *right_matrix, size_t dim)
 {
 	Matrix_Multiplication(res_matrix, left_matrix, right_matrix, dim);
-	copy_from(matrix.dim);
+	copy_from(res_matrix, dim);
 }
 
 template <typename T>
@@ -170,7 +171,7 @@ template <typename T>
 void Matrix<T>::matrix_transposition(T *matrix, size_t dim)
 {
 	Matrix_Transposition(matrix, dim);
-	copy_from(matrix.dim);
+	copy_from(matrix, dim);
 }
 
 template <typename T>
@@ -495,8 +496,7 @@ void Cholesky_Solve_Second_Iteration(double *A21, double *L11, double *L21, int 
 	assert(res);
 	Matrix_Multiplication_Rect(L21, A21, L11T_inverse, (n - r), r, r, r);
 
-	delete[] L11T;
-	delete[] L11T_inverse;
+	delete[] L11T_inverse, L11T;
 }
 
 // A22_red = A22 - L21 * L21T
@@ -535,39 +535,104 @@ void Cholesky_Decomposition_line(double *A, double *L, int n)
 	}
 }
 
+#define BLOCK_SIZE	2
+
+void Cholesky_Decomposition(double *A, double *L, int n)
+{
+	if (n <= BLOCK_SIZE) {
+		Cholesky_Decomposition_line(A, L, n);
+		return;
+	}
+
+
+	// FIRST
+	double *L11 = new double[BLOCK_SIZE * BLOCK_SIZE], *A11 = new double[BLOCK_SIZE * BLOCK_SIZE];
+	for (size_t i = 0; i < BLOCK_SIZE; i++) {
+		for (size_t j = 0; j < BLOCK_SIZE; j++) {
+			MATRIX(L11, i, j, BLOCK_SIZE) = MATRIX(L, i, j, n);
+			MATRIX(A11, i, j, BLOCK_SIZE) = MATRIX(A, i, j, n);
+		}
+	}
+	Cholesky_Decomposition_line(A11, L11, BLOCK_SIZE);
+	for (size_t i = 0; i < BLOCK_SIZE; i++) {
+		for (size_t j = 0; j < BLOCK_SIZE; j++) {
+			MATRIX(L, i, j, n) = MATRIX(L11, i, j, BLOCK_SIZE);
+		}
+	}
+
+
+	// SECOND
+	double *L21 = new double[BLOCK_SIZE * BLOCK_SIZE], *A21 = new double[BLOCK_SIZE * BLOCK_SIZE];
+	size_t k = 0;
+	for (size_t i = 0; i < n - BLOCK_SIZE; i++) {
+		for (size_t j = BLOCK_SIZE; j < BLOCK_SIZE; j++) {
+			MATRIX(L21, i, k, n - BLOCK_SIZE) = MATRIX(L, i, j, n);
+			MATRIX(A21, i, k, n - BLOCK_SIZE) = MATRIX(A, i, j, n);
+			k++;
+		}
+		k = 0;
+	}
+	Cholesky_Solve_Second_Iteration(A21, L11, L21, n, BLOCK_SIZE);
+	for (size_t i = 0; i < n - BLOCK_SIZE; i++) {
+		for (size_t j = BLOCK_SIZE; j < BLOCK_SIZE; j++) {
+			MATRIX(L, i, j, n) = MATRIX(L21, i, k, n - BLOCK_SIZE);
+			k++;
+		}
+		k = 0;
+	}
+
+
+	// THIRD
+	double *A22 = new double[(n - BLOCK_SIZE) * (n - BLOCK_SIZE)], *A22_red = new double[(n - BLOCK_SIZE) * (n - BLOCK_SIZE)];
+	size_t l = 0;
+	for (size_t i = BLOCK_SIZE; i < n - BLOCK_SIZE; i++) {
+		for (size_t j = BLOCK_SIZE; j < n - BLOCK_SIZE; j++) {
+			MATRIX(A22, l, k, n - BLOCK_SIZE) = MATRIX(A, i, j, n);
+			k++;
+		}
+		k = 0;
+		l++;
+	}
+	l = 0;
+	Cholesky_Find_Reduced_Matrix(A22_red, A22, L21, n, BLOCK_SIZE);
+
+	delete[] A11, A21, L11, L21, A22;
+
+	double *L22_red = new double[(n - BLOCK_SIZE) * (n - BLOCK_SIZE)];
+	Cholesky_Decomposition(A22_red, L22_red, n - BLOCK_SIZE);
+	for (size_t i = BLOCK_SIZE; i < n - BLOCK_SIZE; i++) {
+		for (size_t j = BLOCK_SIZE; j < n - BLOCK_SIZE; j++) {
+			MATRIX(L, i, j, n) = MATRIX(L22_red, l, k, n - BLOCK_SIZE);
+			k++;
+		}
+		k = 0;
+		l++;
+	}
+
+	delete[] L22_red;
+}
+
 int main(char **argv, int argc)
 {
-	/*Matrix<double> matrix_obj(5), matrix_res(5);
+	Matrix<double> matrix_obj(5), matrix_res(5);
 	size_t dim = matrix_obj.get_dimension();
 	double *matrix = matrix_obj.get_1d_array();
 	double *result = new double[dim * dim];
 
 	cout << matrix_obj << endl;
 
-	Cholesky_Decomposition_line(matrix, result, dim);
+	Cholesky_Decomposition(matrix, result, dim);
 
 	matrix_res.set_1d_array(result);
 
 	cout << matrix_res << endl;
 	getchar();
 
-	delete[] result;*/
+	delete[] result;
 
-	int n = 2;
-	double A21[] =
-		{ 7, 3, 1, 4 };
-	double L11[] =
-		{ 2, 0, 7, 6 };
-	double L21[4];
-	double A22[] = { 7, 8, 3, 0 };
-	double A21_red[4];
-
-	Cholesky_Solve_Second_Iteration(A21, L11, L21, 4, 2);
-	Cholesky_Find_Reduced_Matrix(A21_red, A22, L21, 4, 2);
-
-	std::copy(L21, L21 + 4, std::ostream_iterator<float>(std::cout, ","));
+	/*std::copy(L21, L21 + 4, std::ostream_iterator<float>(std::cout, ","));
 	cout << endl;
 	std::copy(A21_red, A21_red + 4, std::ostream_iterator<float>(std::cout, ","));
 
-	getchar();
+	getchar();*/
 }
