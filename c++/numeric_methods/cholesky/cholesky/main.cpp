@@ -147,12 +147,21 @@ template <typename T>
 static inline
 void Matrix_Multiplication(T *res_matrix, T *left_matrix, T *right_matrix, int dim)
 {
-	for (size_t i = 0; i < dim; i++) {
-		for (size_t j = 0; j < dim; j++) {
-			MATRIX(res_matrix, i, j, dim) = 0;
-			for (size_t k = 0; k < dim; k++)
-				MATRIX(res_matrix, i, j, dim) +=
-				(MATRIX(left_matrix, i, k, dim) * MATRIX(right_matrix, k, j, dim));
+	Matrix_Multiplication_Rect(res_matrix, left_matrix, right_matrix, dim, dim, dim, dim);
+}
+
+template <typename T>
+static inline
+void Matrix_Multiplication_Rect(T *res_matrix, T *left_matrix, T *right_matrix, int left_dim1, int left_dim2, int right_dim1, int right_dim2)
+{
+	assert(left_dim2 == right_dim1);
+
+	for (size_t i = 0; i < left_dim1; i++) {
+		for (size_t j = 0; j < right_dim2; j++) {
+			MATRIX(res_matrix, i, j, left_dim2) = 0;
+			for (size_t k = 0; k < left_dim2; k++)
+				MATRIX(res_matrix, i, j, left_dim2) +=
+					(MATRIX(left_matrix, i, k, left_dim1) * MATRIX(right_matrix, k, j, right_dim1));
 		}
 	}
 }
@@ -180,6 +189,16 @@ void Matrix_Transposition(T *matrix, size_t dim)
 }
 
 template <typename T>
+static inline
+void Matrix_Transposition_Rect(T *matrix_res, T *matrix, size_t dim1, size_t dim2)
+{
+	for (size_t i = 0; i < dim1; i++) {
+		for (size_t j = 0; j < dim2; j++)
+			MATRIX(matrix_res, j, i, dim2) = MATRIX(matrix, i, j, dim1);
+	}
+}
+
+template <typename T>
 void Matrix<T>::matrix_subtraction(T *res_matrix, T *left_matrix, T *right_matrix, size_t dim)
 {
 	Matrix_Subtraction(res_matrix, left_matrix, right_matrix, dim);
@@ -190,10 +209,17 @@ template <typename T>
 static inline
 void Matrix_Subtraction(T *matrix_res, T *matrix_left, T *matrix_right, size_t dim)
 {
-	for (size_t i = 0; i < dim; i++) {
-		for (size_t j = 0; j < dim; j++) {
-			MATRIX(matrix_res, i, j, dim) =
-				MATRIX(matrix_left, i, j, dim) - MATRIX(matrix_right, i, j, dim);
+	Matrix_Subtraction_Rect(matrix_res, matrix_left, matrix_right, dim, dim);
+}
+
+template <typename T>
+static inline
+void Matrix_Subtraction_Rect(T *matrix_res, T *matrix_left, T *matrix_right, size_t dim1, size_t dim2)
+{
+	for (size_t i = 0; i < dim1; i++) {
+		for (size_t j = 0; j < dim2; j++) {
+			MATRIX(matrix_res, i, j, dim1) =
+				MATRIX(matrix_left, i, j, dim1) - MATRIX(matrix_right, i, j, dim1);
 		}
 	}
 }
@@ -299,7 +325,7 @@ void get_cofactor_matrix(T *mat, T *temp, size_t p, size_t q, size_t n)
 			//  Copying into temporary matrix only those element
 			//  which are not in given row and column
 			if (row != p && col != q) {
-				MATRIX(temp, i, j++, n) = MATRIX(mat, row, col, n);
+				MATRIX(temp, i, j++, n - 1) = MATRIX(mat, row, col, n);
 
 				// Row is filled, so increase row index and
 				// reset col index
@@ -362,6 +388,7 @@ T determinant_matrix(T *mat, size_t n)
 	for (size_t f = 0; f < n; f++) {
 		// Getting Cofactor of mat[0][f]
 		get_cofactor_matrix(mat, temp, 0, f, n);
+
 		D += sign * MATRIX(mat, 0, f, n) * determinant_matrix(temp, n - 1);
 
 		// terms are to be added with alternate sign
@@ -451,20 +478,44 @@ int Matrix<T>::check_sym_pos_def_matrix(void)
 // L21 * L11T = A21
 //	||
 //	\/
-// L11T * L21 = L11T * A21 * L11T_inverse
+// L21 = A21 * L11T_inverse
+//
+// This fucntion calculates L21
+// NOTE:
+//	A21			- (n - r) x r matrix
+//	L11			- r x r matrix
+//	L21			- (n - r) x r matrix
+//	A21 * L11T_inverse 	- (n - r) x r matrix - tre result of the routine (i.e. L21)
 static inline
-void Cholesky_Solve_Second_Iteration(double *A21, double *L11, double *L21, int n)
+void Cholesky_Solve_Second_Iteration(double *A21, double *L11, double *L21, int n, int r)
 {
-	double *L11T = new double[n * n], *L11T_inverse = new double[n * n],
-		*L11T_A21_res = new double[n * n], *L11T_A21_L11T_inverse_res = new double[n * n];
-	memcpy(L11T, L11, sizeof(double) * n *n);
-	Matrix_Transposition(L11T, n);
-	bool res = inverse_matrix(L11T, L11T_inverse, n);
+	double *L11T = new double[r * r], *L11T_inverse = new double[r * r];
+	Matrix_Transposition_Rect(L11T, L11, r, r);
+	bool res = inverse_matrix(L11T, L11T_inverse, r);
 	assert(res);
-	Matrix_Multiplication(L11T_A21_res, L11T, A21, n); // L11T * A21
-	Matrix_Multiplication(L11T_A21_L11T_inverse_res, L11T_A21_res, L11T_inverse, n); // L11T * A21 * L11T_inverse
+	Matrix_Multiplication_Rect(L21, A21, L11T_inverse, (n - r), r, r, r);
 
-	solve_higher_triangular_matrix_system(n, n, L11T, L11T_A21_L11T_inverse_res, L21);
+	delete[] L11T;
+	delete[] L11T_inverse;
+}
+
+// A22_red = A22 - L21 * L21T
+//
+// This fucntion calculates A22_red
+// NOTE:
+//	A22			- (n - r) x (n - r) matrix
+//	L21			- (n - r) x r matrix
+//	L21T			- r x (n - r) matrix
+//	A22 - L21 * L21T 	- (n - r) x (n - r) matrix - tre result of the routine (i.e. A22_red)
+static inline
+void Cholesky_Find_Reduced_Matrix(double *A22_red, double *A22, double *L21, int n, int r)
+{
+	double *L21T = new double[r * (n - r)], *L21_L21T = new double[(n - r) * (n - r)];
+	Matrix_Transposition_Rect(L21T, L21, n - r, r);
+	Matrix_Multiplication_Rect(L21_L21T, L21, L21T, (n - r), r, r, (n - r));
+	Matrix_Subtraction_Rect(A22_red, A22, L21_L21T, (n - r), (n - r));
+
+	delete[] L21T, L21_L21T;
 }
 
 static inline
@@ -502,16 +553,21 @@ int main(char **argv, int argc)
 
 	delete[] result;*/
 
-	int n = 4;
-	double a[16] =
-		{ 1, -2, 6, 2, 0, 3, -2, -1, 0, 0, -1, 1,  0, 0, 0 ,3 };
-	double b[] =
-		{ 2, 4, 6, 5 , 1, 3, 7, 8 , 1, 11, 61, 51 , -1, 2, 3, 4 };
-	double res[16];
+	int n = 2;
+	double A21[] =
+		{ 7, 3, 1, 4 };
+	double L11[] =
+		{ 2, 0, 7, 6 };
+	double L21[4];
+	double A22[] = { 7, 8, 3, 0 };
+	double A21_red[4];
 
-	Cholesky_Solve_Second_Iteration(a, b, res, n);
+	Cholesky_Solve_Second_Iteration(A21, L11, L21, 4, 2);
+	Cholesky_Find_Reduced_Matrix(A21_red, A22, L21, 4, 2);
 
-	std::copy(res, res + 16, std::ostream_iterator<float>(std::cout, ","));
+	std::copy(L21, L21 + 4, std::ostream_iterator<float>(std::cout, ","));
+	cout << endl;
+	std::copy(A21_red, A21_red + 4, std::ostream_iterator<float>(std::cout, ","));
 
 	getchar();
 }
