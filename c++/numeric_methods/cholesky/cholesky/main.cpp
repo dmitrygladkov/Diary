@@ -616,7 +616,6 @@ static inline
 void Cholesky_Decomposition_line(double *A, double *L, int n)
 {
 	double sum = 0;
-	memset(L, 0, (n * n) * sizeof(double));
 	for (int i = 0; i < n; i++) {
 		for (int j = 0; j < i; j++) {
 			for (int k = 0; k < j; k++)
@@ -634,7 +633,6 @@ void Cholesky_Decomposition_line_block(double *A, double *L, int n,
 					int begin_i, int begin_j, int total_n)
 {
 	double sum = 0;
-	memset(L, 0, (n * n) * sizeof(double));
 	for (int i = 0; i < n; i++) {
 		for (int j = 0; j < i; j++) {
 			for (int k = 0; k < j; k++)
@@ -661,8 +659,6 @@ void Cholesky_Decomposition(double *A, double *L, int n)
 		return;
 	}
 
-	memset(L, 0, (n * n) * sizeof(double));
-
 	// FIRST
 	Cholesky_Decomposition_line_block(A, L, BLOCK_SIZE, 0, 0, n);
 
@@ -681,7 +677,7 @@ void Cholesky_Decomposition(double *A, double *L, int n)
 						);
 
 	double *L22_red = new double[(n - BLOCK_SIZE) * (n - BLOCK_SIZE)];
-
+	memset(L22_red, 0, sizeof(double) * (n - BLOCK_SIZE) * (n - BLOCK_SIZE));
 	Cholesky_Decomposition(A22_red, L22_red, n - BLOCK_SIZE);
 	size_t k = 0, l = 0;
 	for (size_t i = BLOCK_SIZE; i < n; i++) {
@@ -698,10 +694,11 @@ void Cholesky_Decomposition(double *A, double *L, int n)
 
 int main(char **argv, int argc)
 {
-	Matrix<double> matrix_obj(4), matrix_res(4);
+	Matrix<double> matrix_obj(4), matrix_res(4), matrix_check(4);
 	size_t dim = matrix_obj.get_dimension();
 	double *matrix = matrix_obj.get_1d_array();
-	double *result = new double[dim * dim];
+	double *result = new double[dim * dim], *result_check = new double[dim * dim], *result_t = new double[dim * dim];
+	memset(result, 0, sizeof(double) * dim * dim);
 
 	cout << matrix_obj << endl;
 
@@ -709,7 +706,17 @@ int main(char **argv, int argc)
 
 	matrix_res.set_1d_array(result);
 
+	Matrix_Transposition_Rect(result_t, result, dim, dim);
+	Matrix_Multiplication(result_check, result, result_t, dim);
+
+	matrix_check.set_1d_array(result_check);
+
+	cout << "Result:" << endl;
 	cout << matrix_res << endl;
+
+	cout << "Check:" << endl;
+	cout << matrix_check << endl;
+
 	getchar();
 
 	delete[] result;
