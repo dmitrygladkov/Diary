@@ -544,12 +544,12 @@ void Cholesky_Decomposition(double *A, double *L, int n)
 		return;
 	}
 
+	memset(L, 0, (n * n) * sizeof(double));
 
 	// FIRST
 	double *L11 = new double[BLOCK_SIZE * BLOCK_SIZE], *A11 = new double[BLOCK_SIZE * BLOCK_SIZE];
 	for (size_t i = 0; i < BLOCK_SIZE; i++) {
 		for (size_t j = 0; j < BLOCK_SIZE; j++) {
-			MATRIX(L11, i, j, BLOCK_SIZE) = MATRIX(L, i, j, n);
 			MATRIX(A11, i, j, BLOCK_SIZE) = MATRIX(A, i, j, n);
 		}
 	}
@@ -564,29 +564,28 @@ void Cholesky_Decomposition(double *A, double *L, int n)
 	// SECOND
 	double *L21 = new double[BLOCK_SIZE * BLOCK_SIZE], *A21 = new double[BLOCK_SIZE * BLOCK_SIZE];
 	size_t k = 0;
-	for (size_t i = 0; i < n - BLOCK_SIZE; i++) {
-		for (size_t j = BLOCK_SIZE; j < BLOCK_SIZE; j++) {
-			MATRIX(L21, i, k, n - BLOCK_SIZE) = MATRIX(L, i, j, n);
-			MATRIX(A21, i, k, n - BLOCK_SIZE) = MATRIX(A, i, j, n);
-			k++;
+	for (size_t i = BLOCK_SIZE; i < n; i++) {
+		for (size_t j = 0; j < n - BLOCK_SIZE; j++) {
+			MATRIX(A21, k, j, n - BLOCK_SIZE) = MATRIX(A, i, j, n);
 		}
-		k = 0;
+		k++;
 	}
+	k = 0;
 	Cholesky_Solve_Second_Iteration(A21, L11, L21, n, BLOCK_SIZE);
-	for (size_t i = 0; i < n - BLOCK_SIZE; i++) {
-		for (size_t j = BLOCK_SIZE; j < BLOCK_SIZE; j++) {
-			MATRIX(L, i, j, n) = MATRIX(L21, i, k, n - BLOCK_SIZE);
-			k++;
+	for (size_t i = BLOCK_SIZE; i < n; i++) {
+		for (size_t j = 0; j < n - BLOCK_SIZE; j++) {
+			MATRIX(L, i, j, n) = MATRIX(L21, k, j, n - BLOCK_SIZE);
 		}
-		k = 0;
+		k++;
 	}
 
 
 	// THIRD
-	double *A22 = new double[(n - BLOCK_SIZE) * (n - BLOCK_SIZE)], *A22_red = new double[(n - BLOCK_SIZE) * (n - BLOCK_SIZE)];
 	size_t l = 0;
-	for (size_t i = BLOCK_SIZE; i < n - BLOCK_SIZE; i++) {
-		for (size_t j = BLOCK_SIZE; j < n - BLOCK_SIZE; j++) {
+	k = 0;
+	double *A22 = new double[(n - BLOCK_SIZE) * (n - BLOCK_SIZE)], *A22_red = new double[(n - BLOCK_SIZE) * (n - BLOCK_SIZE)];
+	for (size_t i = BLOCK_SIZE; i < n; i++) {
+		for (size_t j = BLOCK_SIZE; j < n; j++) {
 			MATRIX(A22, l, k, n - BLOCK_SIZE) = MATRIX(A, i, j, n);
 			k++;
 		}
@@ -599,9 +598,10 @@ void Cholesky_Decomposition(double *A, double *L, int n)
 	delete[] A11, A21, L11, L21, A22;
 
 	double *L22_red = new double[(n - BLOCK_SIZE) * (n - BLOCK_SIZE)];
+
 	Cholesky_Decomposition(A22_red, L22_red, n - BLOCK_SIZE);
-	for (size_t i = BLOCK_SIZE; i < n - BLOCK_SIZE; i++) {
-		for (size_t j = BLOCK_SIZE; j < n - BLOCK_SIZE; j++) {
+	for (size_t i = BLOCK_SIZE; i < n; i++) {
+		for (size_t j = BLOCK_SIZE; j < n; j++) {
 			MATRIX(L, i, j, n) = MATRIX(L22_red, l, k, n - BLOCK_SIZE);
 			k++;
 		}
@@ -614,7 +614,7 @@ void Cholesky_Decomposition(double *A, double *L, int n)
 
 int main(char **argv, int argc)
 {
-	Matrix<double> matrix_obj(5), matrix_res(5);
+	Matrix<double> matrix_obj(4), matrix_res(4);
 	size_t dim = matrix_obj.get_dimension();
 	double *matrix = matrix_obj.get_1d_array();
 	double *result = new double[dim * dim];
