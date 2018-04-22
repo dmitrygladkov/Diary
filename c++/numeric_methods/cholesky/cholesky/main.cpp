@@ -276,8 +276,8 @@ void Matrix_Subtraction_Rect_block(T *matrix_res, T *matrix_left, T *matrix_righ
 				int begin_i, int begin_j, int total_dim)
 {
 #pragma omp parallel for
-	for (size_t i = 0; i < dim1; i++) {
-		for (size_t j = 0; j < dim2; j++) {
+	for (int i = 0; i < (int)dim1; i++) {
+		for (int j = 0; j < (int)dim2; j++) {
 			MATRIX(matrix_res, i, j, dim1) =
 				BLOCK_MATRIX(matrix_left, i, j, begin_i, begin_j, total_dim) - MATRIX(matrix_right, i, j, dim1);
 		}
@@ -289,8 +289,8 @@ static inline
 void Matrix_Subtraction_Rect(T *matrix_res, T *matrix_left, T *matrix_right, size_t dim1, size_t dim2)
 {
 #pragma omp parallel for
-	for (size_t i = 0; i < dim1; i++) {
-		for (size_t j = 0; j < dim2; j++) {
+	for (int i = 0; i < (int)dim1; i++) {
+		for (int j = 0; j < (int)dim2; j++) {
 			MATRIX(matrix_res, i, j, dim1) =
 				MATRIX(matrix_left, i, j, dim1) - MATRIX(matrix_right, i, j, dim1);
 		}
