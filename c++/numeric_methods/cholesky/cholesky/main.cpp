@@ -482,10 +482,10 @@ static inline void adjoint_matrix(T *A, T *adj, size_t dim)
 	}
 
 	// temp is used to store cofactors of A[][]
-	int sign = 1;
-	T *temp = new T[dim * dim];
-
+#pragma omp parallel for
 	for (int i = 0; i < (int)dim; i++) {
+		int sign = 1;
+		T *temp = new T[dim * dim];
 		for (int j = 0; j < (int)dim; j++) {
 			// Get cofactor of A[i][j]
 			get_cofactor_matrix(A, temp, i, j, dim);
@@ -498,8 +498,8 @@ static inline void adjoint_matrix(T *A, T *adj, size_t dim)
 			// transpose of the cofactor matrix
 			MATRIX(adj, j, i, dim) = (sign)*(determinant_matrix(temp, dim - 1));
 		}
+		delete[] temp;
 	}
-	delete[] temp;
 }
 
 // Function to calculate and store inverse, returns false if
@@ -550,6 +550,8 @@ int Matrix<T>::check_sym_pos_def_matrix(void)
 	return 0;
 }
 
+static double *L11T_preallocated, *L11T_inverse_preallocated;
+
 // L21 * L11T = A21
 //	||
 //	\/
@@ -565,14 +567,14 @@ int Matrix<T>::check_sym_pos_def_matrix(void)
 static inline
 void Cholesky_Solve_Second_Iteration(double *A21, double *L11, double *L21, int n, int r)
 {
-	double *L11T = new double[r * r], *L11T_inverse = new double[r * r];
+	double *L11T = L11T_preallocated, *L11T_inverse = L11T_inverse_preallocated;
 	Matrix_Transposition_Rect(L11T, L11, r, r);
 	bool res = inverse_matrix(L11T, L11T_inverse, r);
 	assert(res);
-	delete[] L11T;
+	//delete[] L11T;
 	Matrix_Multiplication_Rect(L21, A21, L11T_inverse, (n - r), r, r, r);
 
-	delete[] L11T_inverse;
+	//delete[] L11T_inverse;
 }
 
 // NOTE: int begin_i_A21, int begin_j_A21, int total_len_A21 are valid for L21
@@ -582,35 +584,17 @@ void Cholesky_Solve_Second_Iteration_block(double *A21, double *L11, double *L21
 	int begin_i_L21, int begin_j_L21, int total_len_L21,
 	int begin_i_A21, int begin_j_A21, int total_len_A21)
 {
-	double *L11T = new double[r * r], *L11T_inverse;
-#pragma omp parallel sections
-	{
-#pragma omp section
-		{
-			L11T_inverse = new double[r * r];
-		}
-#pragma omp section
-		{
-			Matrix_Transposition_Rect_block(L11T, L11, r, r, begin_i_L11, begin_j_L11, total_len_L11);
-		}
-	}
+	double *L11T = L11T_preallocated, *L11T_inverse = L11T_inverse_preallocated;
+
+	Matrix_Transposition_Rect_block(L11T, L11, r, r, begin_i_L11, begin_j_L11, total_len_L11);
 
 	bool res = inverse_matrix(L11T, L11T_inverse, r);
 	assert(res);
-#pragma omp parallel sections
-	{
-#pragma omp section
-		{
-			delete[] L11T;
-		}
-#pragma omp section
-		{
-			Matrix_Multiplication_Rect_res_left_block(L21, A21, L11T_inverse, (n - r), r, r, r,
-				begin_i_A21, begin_j_A21, total_len_A21,
-				begin_i_L21, begin_j_L21, total_len_L21);
-		}
-	}
-	delete[] L11T_inverse;
+	//delete[] L11T;
+	Matrix_Multiplication_Rect_res_left_block(L21, A21, L11T_inverse, (n - r), r, r, r,
+							begin_i_A21, begin_j_A21, total_len_A21,
+							begin_i_L21, begin_j_L21, total_len_L21);
+	//delete[] L11T_inverse;
 }
 
 // A22_red = A22 - L21 * L21T
@@ -624,10 +608,22 @@ void Cholesky_Solve_Second_Iteration_block(double *A21, double *L11, double *L21
 static inline
 void Cholesky_Find_Reduced_Matrix(double *A22_red, double *A22, double *L21, int n, int r)
 {
-	double *L21T = new double[r * (n - r)], *L21_L21T = new double[(n - r) * (n - r)];
+	double *L21T = new double[r * (n - r)], *L21_L21T;
 
-	Matrix_Transposition_Rect(L21T, L21, n - r, r);
+#pragma omp parallel sections
+	{
+#pragma omp section
+		{
+			L21_L21T = new double[(n - r) * (n - r)];
+		}
+#pragma omp section
+		{
+			Matrix_Transposition_Rect(L21T, L21, n - r, r);
+		}
+	}
+
 	Matrix_Multiplication_Rect(L21_L21T, L21, L21T, (n - r), r, r, (n - r));
+
 #pragma omp parallel sections
 	{
 #pragma omp section
@@ -759,20 +755,18 @@ void Cholesky_Decomposition_recursive_block(double *A, double *L, int n,
 		BLOCK_SIZE, 0, n					// A21
 	);
 
-	{
-		double *A22_red = new double[(n - BLOCK_SIZE) * (n - BLOCK_SIZE)];
+	double *A22_red = new double[(n - BLOCK_SIZE) * (n - BLOCK_SIZE)];
 
-		// THIRD
-		Cholesky_Find_Reduced_Matrix_block(A22_red, A, L, n, BLOCK_SIZE,
-			L_begin_i + BLOCK_SIZE, L_begin_j + 0, n_full,	// L21
-			BLOCK_SIZE, BLOCK_SIZE, n			// A22
-		);
+	// THIRD
+	Cholesky_Find_Reduced_Matrix_block(A22_red, A, L, n, BLOCK_SIZE,
+		L_begin_i + BLOCK_SIZE, L_begin_j + 0, n_full,	// L21
+		BLOCK_SIZE, BLOCK_SIZE, n			// A22
+	);
 
-		delete[] A;
+	delete[] A;
 
-		Cholesky_Decomposition_recursive_block(A22_red, L, n - BLOCK_SIZE, A_full, n_full,
-							L_begin_i + BLOCK_SIZE, L_begin_j + BLOCK_SIZE);
-	}
+	Cholesky_Decomposition_recursive_block(A22_red, L, n - BLOCK_SIZE, A_full, n_full,
+						L_begin_i + BLOCK_SIZE, L_begin_j + BLOCK_SIZE);
 }
 
 void Cholesky_Decomposition(double *A, double *L, int n)
@@ -787,11 +781,22 @@ void Cholesky_Decomposition(double *A, double *L, int n)
 		Cholesky_Decomposition_line(A, L, n);
 		return;
 	}
-	// FIRST
-	Cholesky_Decomposition_line_block(A, L, BLOCK_SIZE,
-					0, 0, n,
-					0, 0, n);
 
+#pragma omp parallel sections
+	{
+#pragma omp section
+		{
+			L11T_preallocated = new double[BLOCK_SIZE * BLOCK_SIZE];
+			L11T_inverse_preallocated = new double[BLOCK_SIZE * BLOCK_SIZE];
+		}
+#pragma omp section
+		{
+			// FIRST
+			Cholesky_Decomposition_line_block(A, L, BLOCK_SIZE,
+				0, 0, n,
+				0, 0, n);
+		}
+	}
 
 	// SECOND
 	Cholesky_Solve_Second_Iteration_block(A, L, L, n, BLOCK_SIZE,
@@ -810,6 +815,8 @@ void Cholesky_Decomposition(double *A, double *L, int n)
 	);
 
 	Cholesky_Decomposition_recursive_block(A22_red, L, n - BLOCK_SIZE, A, n, BLOCK_SIZE, BLOCK_SIZE);
+
+	delete[] L11T_preallocated, L11T_inverse_preallocated;
 }
 
 int main(char **argv, int argc)
