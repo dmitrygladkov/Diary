@@ -159,9 +159,9 @@ static inline
 void Matrix_Multiplication_Rect(T *res_matrix, T *left_matrix, T *right_matrix, int left_dim1, int left_dim2, int right_dim1, int right_dim2)
 {
 	assert(left_dim2 == right_dim1);
-
-	for (size_t i = 0; i < left_dim1; i++) {
-		for (size_t j = 0; j < right_dim2; j++) {
+#pragma omp parallel for
+	for (int i = 0; i < (int)left_dim1; i++) {
+		for (int j = 0; j < (int)right_dim2; j++) {
 			MATRIX(res_matrix, i, j, right_dim2) = 0;
 			for (size_t k = 0; k < left_dim2; k++)
 				MATRIX(res_matrix, i, j, right_dim2) +=
@@ -177,9 +177,9 @@ void Matrix_Multiplication_Rect_left_block(T *res_matrix, T *left_matrix, T *rig
 					int begin_i_left, int begin_j_left, int total_dim_left)
 {
 	assert(left_dim2 == right_dim1);
-
-	for (size_t i = 0; i < left_dim1; i++) {
-		for (size_t j = 0; j < right_dim2; j++) {
+#pragma omp parallel for
+	for (int i = 0; i < (int)left_dim1; i++) {
+		for (int j = 0; j < (int)right_dim2; j++) {
 			MATRIX(res_matrix, i, j, right_dim2) = 0;
 			for (size_t k = 0; k < left_dim2; k++) {
 				MATRIX(res_matrix, i, j, right_dim2) +=
@@ -197,9 +197,9 @@ void Matrix_Multiplication_Rect_res_left_block(T *res_matrix, T *left_matrix, T 
 						int begin_i_res, int begin_j_res, int total_dim_res)
 {
 	assert(left_dim2 == right_dim1);
-
-	for (size_t i = 0; i < left_dim1; i++) {
-		for (size_t j = 0; j < right_dim2; j++) {
+#pragma omp parallel for
+	for (int i = 0; i < (int)left_dim1; i++) {
+		for (int j = 0; j < (int)right_dim2; j++) {
 			BLOCK_MATRIX(res_matrix, i, j, begin_i_res, begin_j_res, total_dim_res) = 0;
 
 			for (size_t k = 0; k < left_dim2; k++) {
@@ -236,8 +236,9 @@ template <typename T>
 static inline
 void Matrix_Transposition_Rect(T *matrix_res, T *matrix, size_t dim1, size_t dim2)
 {
-	for (size_t i = 0; i < dim1; i++) {
-		for (size_t j = 0; j < dim2; j++) {
+#pragma omp parallel for
+	for (int i = 0; i < (int)dim1; i++) {
+		for (int j = 0; j < (int)dim2; j++) {
 			MATRIX(matrix_res, j, i, dim1) = MATRIX(matrix, i, j, dim2);
 		}
 	}
@@ -247,8 +248,9 @@ template <typename T>
 static inline
 void Matrix_Transposition_Rect_block(T *matrix_res, T *matrix, size_t dim1, size_t dim2, size_t begin_i, size_t begin_j, size_t total_dim)
 {
-	for (size_t i = 0; i < dim1; i++) {
-		for (size_t j = 0; j < dim2; j++) {
+#pragma omp parallel for
+	for (int i = 0; i < (int)dim1; i++) {
+		for (int j = 0; j < (int)dim2; j++) {
 			MATRIX(matrix_res, j, i, dim1) = BLOCK_MATRIX(matrix, i, j, begin_i, begin_j, total_dim);
 		}
 	}
@@ -273,8 +275,9 @@ static inline
 void Matrix_Subtraction_Rect_block(T *matrix_res, T *matrix_left, T *matrix_right, size_t dim1, size_t dim2,
 				int begin_i, int begin_j, int total_dim)
 {
-	for (size_t i = 0; i < dim1; i++) {
-		for (size_t j = 0; j < dim2; j++) {
+#pragma omp parallel for
+	for (int i = 0; i < (int)dim1; i++) {
+		for (int j = 0; j < (int)dim2; j++) {
 			MATRIX(matrix_res, i, j, dim1) =
 				BLOCK_MATRIX(matrix_left, i, j, begin_i, begin_j, total_dim) - MATRIX(matrix_right, i, j, dim1);
 		}
@@ -438,37 +441,6 @@ T Matrix<T>::determinant(T **mat, size_t n)
 	return D;
 }
 
-static double *L11T_global, *L11T_inverse_global, *adj_tmp_global, *inverse_adj_global, *det_global;
-
-template <typename T>
-static inline
-T determinant_matrix_global(T *mat, size_t n)
-{
-	T D = 0; // Initialize result
-
-		 //  Base case : if matrix contains single element
-	if (n == 1)
-		return MATRIX(mat, 0, 0, n);
-
-	// To store cofactors
-	T *temp = det_global;
-
-	int sign = 1; // To store sign multiplier
-
-		      // Iterate for each element of first row
-	for (size_t f = 0; f < n; f++) {
-		// Getting Cofactor of mat[0][f]
-		get_cofactor_matrix(mat, temp, 0, f, n);
-
-		D += sign * MATRIX(mat, 0, f, n) * determinant_matrix(temp, n - 1);
-
-		// terms are to be added with alternate sign
-		sign = -sign;
-	}
-
-	return D;
-}
-
 template <typename T>
 static inline
 T determinant_matrix(T *mat, size_t n)
@@ -510,10 +482,10 @@ static inline void adjoint_matrix(T *A, T *adj, size_t dim)
 
 	// temp is used to store cofactors of A[][]
 	int sign = 1;
-	T *temp = adj_tmp_global;
+	T *temp = new T[dim * dim];
 
-	for (size_t i = 0; i < dim; i++) {
-		for (size_t j = 0; j < dim; j++) {
+	for (int i = 0; i < (int)dim; i++) {
+		for (int j = 0; j < (int)dim; j++) {
 			// Get cofactor of A[i][j]
 			get_cofactor_matrix(A, temp, i, j, dim);
 
@@ -526,6 +498,7 @@ static inline void adjoint_matrix(T *A, T *adj, size_t dim)
 			MATRIX(adj, j, i, dim) = (sign)*(determinant_matrix(temp, dim - 1));
 		}
 	}
+	delete[] temp;
 }
 
 // Function to calculate and store inverse, returns false if
@@ -534,20 +507,22 @@ template <typename T>
 static inline bool inverse_matrix(T *A, T *inverse, size_t dim)
 {
 	// Find determinant of A[][]
-	T det = determinant_matrix_global(A, dim);
+	T det = determinant_matrix(A, dim);
 	if (det == 0) {
 		cout << "Singular matrix, can't find its inverse";
 		return false;
 	}
 
 	// Find adjoint
-	T * adj = inverse_adj_global;
+	T * adj = new T[dim * dim];
 	adjoint_matrix(A, adj, dim);
 
 	// Find Inverse using formula "inverse(A) = adj(A)/det(A)"
-	for (size_t i = 0; i < dim; i++)
-		for (size_t j = 0; j < dim; j++)
+#pragma omp parallel for
+	for (int i = 0; i < (int)dim; i++)
+		for (int j = 0; j < (int)dim; j++)
 			MATRIX(inverse, i, j, dim) = MATRIX(adj, i, j, dim) / det;
+	delete[] adj;
 	return true;
 }
 
@@ -606,13 +581,15 @@ void Cholesky_Solve_Second_Iteration_block(double *A21, double *L11, double *L21
 	int begin_i_L21, int begin_j_L21, int total_len_L21,
 	int begin_i_A21, int begin_j_A21, int total_len_A21)
 {
-	double *L11T = L11T_global, *L11T_inverse = L11T_inverse_global;
+	double *L11T = new double[r * r], *L11T_inverse = new double[r * r];
 	Matrix_Transposition_Rect_block(L11T, L11, r, r, begin_i_L11, begin_j_L11, total_len_L11);
 	bool res = inverse_matrix(L11T, L11T_inverse, r);
 	assert(res);
+	delete[] L11T;
 	Matrix_Multiplication_Rect_res_left_block(L21, A21, L11T_inverse, (n - r), r, r, r,
 		begin_i_A21, begin_j_A21, total_len_A21,
 		begin_i_L21, begin_j_L21, total_len_L21);
+	delete[] L11T_inverse;
 }
 
 // A22_red = A22 - L21 * L21T
@@ -712,17 +689,6 @@ void Cholesky_Decomposition_recursive_block(double *A, double *L, int n,
 		Cholesky_Decomposition_line_block(A, L, n,
 						0, 0, n,
 						L_begin_i, L_begin_j, n_full);
-		/*{
-			size_t k = 0, l = 0;
-			for (size_t i = n_full - n; i < n_full; i++) {
-				for (size_t j = n_full - n; j < n_full; j++) {
-					MATRIX(L_full, i, j, n_full) = MATRIX(L, l, k, n);
-					k++;
-				}
-				k = 0;
-				l++;
-			}
-		}*/
 
 		delete[] A;
 		return;
@@ -769,11 +735,6 @@ void Cholesky_Decomposition(double *A, double *L, int n)
 		Cholesky_Decomposition_line(A, L, n);
 		return;
 	}
-	L11T_global = new double[BLOCK_SIZE * BLOCK_SIZE];
-	L11T_inverse_global = new double[BLOCK_SIZE * BLOCK_SIZE];
-	adj_tmp_global = new double[BLOCK_SIZE * BLOCK_SIZE];
-	inverse_adj_global = new double[BLOCK_SIZE * BLOCK_SIZE];
-	det_global = new double[BLOCK_SIZE * BLOCK_SIZE];
 	// FIRST
 	Cholesky_Decomposition_line_block(A, L, BLOCK_SIZE,
 					0, 0, n,
@@ -797,7 +758,6 @@ void Cholesky_Decomposition(double *A, double *L, int n)
 	);
 
 	Cholesky_Decomposition_recursive_block(A22_red, L, n - BLOCK_SIZE, A, n, BLOCK_SIZE, BLOCK_SIZE);
-	delete[] L11T_global, L11T_inverse_global, adj_tmp_global, inverse_adj_global, det_global;
 }
 
 int main(char **argv, int argc)
