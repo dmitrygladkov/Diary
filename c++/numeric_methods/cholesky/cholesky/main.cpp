@@ -593,9 +593,10 @@ void Cholesky_Solve_Second_Iteration(double *A21, double *L11, double *L21, int 
 	Matrix_Transposition_Rect(L11T, L11, r, r);
 	bool res = inverse_matrix(L11T, L11T_inverse, r);
 	assert(res);
+	delete[] L11T;
 	Matrix_Multiplication_Rect(L21, A21, L11T_inverse, (n - r), r, r, r);
 
-	delete[] L11T_inverse, L11T;
+	delete[] L11T_inverse;
 }
 
 // NOTE: int begin_i_A21, int begin_j_A21, int total_len_A21 are valid for L21
@@ -629,9 +630,10 @@ void Cholesky_Find_Reduced_Matrix(double *A22_red, double *A22, double *L21, int
 
 	Matrix_Transposition_Rect(L21T, L21, n - r, r);
 	Matrix_Multiplication_Rect(L21_L21T, L21, L21T, (n - r), r, r, (n - r));
+	delete[] L21T;
 	Matrix_Subtraction_Rect(A22_red, A22, L21_L21T, (n - r), (n - r));
 
-	delete[] L21T, L21_L21T;
+	delete[] L21_L21T;
 }
 
 static inline
@@ -642,9 +644,10 @@ void Cholesky_Find_Reduced_Matrix_block(double *A22_red, double *A22, double *L2
 	double *L21T = new double[r * (n - r)], *L21_L21T = new double[(n - r) * (n - r)];
 	Matrix_Transposition_Rect_block(L21T, L21, n - r, r, begin_i_L21, begin_j_L21, total_len_L21);
 	Matrix_Multiplication_Rect_left_block(L21_L21T, L21, L21T, (n - r), r, r, (n - r), begin_i_L21, begin_j_L21, total_len_L21);
+	delete[] L21T;
 	Matrix_Subtraction_Rect_block(A22_red, A22, L21_L21T, (n - r), (n - r), begin_i_A22, begin_j_A22, total_len_A22);
 
-	delete[] L21T, L21_L21T;
+	delete[] L21_L21T;
 }
 
 static inline
