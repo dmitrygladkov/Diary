@@ -438,6 +438,37 @@ T Matrix<T>::determinant(T **mat, size_t n)
 	return D;
 }
 
+static double *L11T_global, *L11T_inverse_global, *adj_tmp_global, *inverse_adj_global, *det_global;
+
+template <typename T>
+static inline
+T determinant_matrix_global(T *mat, size_t n)
+{
+	T D = 0; // Initialize result
+
+		 //  Base case : if matrix contains single element
+	if (n == 1)
+		return MATRIX(mat, 0, 0, n);
+
+	// To store cofactors
+	T *temp = det_global;
+
+	int sign = 1; // To store sign multiplier
+
+		      // Iterate for each element of first row
+	for (size_t f = 0; f < n; f++) {
+		// Getting Cofactor of mat[0][f]
+		get_cofactor_matrix(mat, temp, 0, f, n);
+
+		D += sign * MATRIX(mat, 0, f, n) * determinant_matrix(temp, n - 1);
+
+		// terms are to be added with alternate sign
+		sign = -sign;
+	}
+
+	return D;
+}
+
 template <typename T>
 static inline
 T determinant_matrix(T *mat, size_t n)
@@ -479,7 +510,7 @@ static inline void adjoint_matrix(T *A, T *adj, size_t dim)
 
 	// temp is used to store cofactors of A[][]
 	int sign = 1;
-	T *temp = new T[dim*dim];
+	T *temp = adj_tmp_global;
 
 	for (size_t i = 0; i < dim; i++) {
 		for (size_t j = 0; j < dim; j++) {
@@ -503,21 +534,20 @@ template <typename T>
 static inline bool inverse_matrix(T *A, T *inverse, size_t dim)
 {
 	// Find determinant of A[][]
-	T det = determinant_matrix(A, dim);
+	T det = determinant_matrix_global(A, dim);
 	if (det == 0) {
 		cout << "Singular matrix, can't find its inverse";
 		return false;
 	}
 
 	// Find adjoint
-	T * adj = new T[dim*dim];;
+	T * adj = inverse_adj_global;
 	adjoint_matrix(A, adj, dim);
 
 	// Find Inverse using formula "inverse(A) = adj(A)/det(A)"
 	for (size_t i = 0; i < dim; i++)
 		for (size_t j = 0; j < dim; j++)
 			MATRIX(inverse, i, j, dim) = MATRIX(adj, i, j, dim) / det;
-
 	return true;
 }
 
@@ -555,6 +585,7 @@ int Matrix<T>::check_sym_pos_def_matrix(void)
 //	L11			- r x r matrix
 //	L21			- (n - r) x r matrix
 //	A21 * L11T_inverse 	- (n - r) x r matrix - tre result of the routine (i.e. L21)
+
 static inline
 void Cholesky_Solve_Second_Iteration(double *A21, double *L11, double *L21, int n, int r)
 {
@@ -571,17 +602,16 @@ void Cholesky_Solve_Second_Iteration(double *A21, double *L11, double *L21, int 
 static inline
 void Cholesky_Solve_Second_Iteration_block(double *A21, double *L11, double *L21, int n, int r,
 	int begin_i_L11, int begin_j_L11, int total_len_L11,
+	int begin_i_L21, int begin_j_L21, int total_len_L21,
 	int begin_i_A21, int begin_j_A21, int total_len_A21)
 {
-	double *L11T = new double[r * r], *L11T_inverse = new double[r * r];
+	double *L11T = L11T_global, *L11T_inverse = L11T_inverse_global;
 	Matrix_Transposition_Rect_block(L11T, L11, r, r, begin_i_L11, begin_j_L11, total_len_L11);
 	bool res = inverse_matrix(L11T, L11T_inverse, r);
 	assert(res);
 	Matrix_Multiplication_Rect_res_left_block(L21, A21, L11T_inverse, (n - r), r, r, r,
 		begin_i_A21, begin_j_A21, total_len_A21,
-		begin_i_A21, begin_j_A21, total_len_A21);
-
-	delete[] L11T_inverse, L11T;
+		begin_i_L21, begin_j_L21, total_len_L21);
 }
 
 // A22_red = A22 - L21 * L21T
@@ -638,30 +668,91 @@ void Cholesky_Decomposition_line(double *A, double *L, int n)
 
 static inline
 void Cholesky_Decomposition_line_block(double *A, double *L, int n,
-					int begin_i, int begin_j, int total_n)
+					int A_begin_i, int A_begin_j, int A_total_n,
+					int L_begin_i, int L_begin_j, int L_total_n)
 {
 	double sum = 0;
 	for (int i = 0; i < n; i++) {
 		for (int j = 0; j < i; j++) {
 			sum = 0;
 			for (int k = 0; k < j; k++)
-				sum += (BLOCK_MATRIX(L, i, k, begin_i, begin_j, total_n) *
-					BLOCK_MATRIX(L, j, k, begin_i, begin_j, total_n));
-			BLOCK_MATRIX(L, i, j, begin_i, begin_j, total_n) =
-				(BLOCK_MATRIX(A, i, j, begin_i, begin_j, total_n) - sum) /
-				 BLOCK_MATRIX(L, j, j, begin_i, begin_j, total_n);
+				sum += (BLOCK_MATRIX(L, i, k, L_begin_i, L_begin_j, L_total_n) *
+					BLOCK_MATRIX(L, j, k, L_begin_i, L_begin_j, L_total_n));
+			BLOCK_MATRIX(L, i, j, L_begin_i, L_begin_j, L_total_n) =
+				(BLOCK_MATRIX(A, i, j, A_begin_i, A_begin_j, A_total_n) - sum) /
+				 BLOCK_MATRIX(L, j, j, L_begin_i, L_begin_j, L_total_n);
 		}
 		sum = 0;
 		for (int k = 0; k < i; k++)
-			sum += pow(BLOCK_MATRIX(L, i, k, begin_i, begin_j, total_n), 2);
-		BLOCK_MATRIX(L, i, i, begin_i, begin_j, total_n) =
-			sqrt(BLOCK_MATRIX(A, i, i, begin_i, begin_j, total_n) - sum);
+			sum += pow(BLOCK_MATRIX(L, i, k, L_begin_i, L_begin_j, L_total_n), 2);
+		BLOCK_MATRIX(L, i, i, L_begin_i, L_begin_j, L_total_n) =
+			sqrt(BLOCK_MATRIX(A, i, i, A_begin_i, A_begin_j, A_total_n) - sum);
 		sum = 0;
 	}
 }
 
 
-static int BLOCK_SIZE = 4;
+static int BLOCK_SIZE = 8;
+
+static inline
+void Cholesky_Decomposition_recursive_block(double *A, double *L, int n,
+						double *A_full, int n_full,
+						int L_begin_i, int L_begin_j)
+{
+	//BLOCK_SIZE = n / 4; // 25% of initial matrix
+	//if (BLOCK_SIZE == 1) {
+	//	Cholesky_Decomposition_line(A, L, n);
+	//	return;
+	//}
+	if (n <= BLOCK_SIZE) {
+		//Cholesky_Decomposition_line(A, L, n);
+		Cholesky_Decomposition_line_block(A, L, n,
+						0, 0, n,
+						L_begin_i, L_begin_j, n_full);
+		/*{
+			size_t k = 0, l = 0;
+			for (size_t i = n_full - n; i < n_full; i++) {
+				for (size_t j = n_full - n; j < n_full; j++) {
+					MATRIX(L_full, i, j, n_full) = MATRIX(L, l, k, n);
+					k++;
+				}
+				k = 0;
+				l++;
+			}
+		}*/
+
+		delete[] A;
+		return;
+	}
+
+	// FIRST
+	Cholesky_Decomposition_line_block(A, L, BLOCK_SIZE,
+					  0, 0, n,
+					  L_begin_i, L_begin_j, n_full);
+
+
+	// SECOND
+	Cholesky_Solve_Second_Iteration_block(A, L, L, n, BLOCK_SIZE,
+		L_begin_i + 0, L_begin_j + 0, n_full,			// L11
+		L_begin_i + BLOCK_SIZE, L_begin_j + 0, n_full,		// L21
+		BLOCK_SIZE, 0, n					// A21
+	);
+
+	{
+		double *A22_red = new double[(n - BLOCK_SIZE) * (n - BLOCK_SIZE)];
+
+		// THIRD
+		Cholesky_Find_Reduced_Matrix_block(A22_red, A, L, n, BLOCK_SIZE,
+			L_begin_i + BLOCK_SIZE, L_begin_j + 0, n_full,	// L21
+			BLOCK_SIZE, BLOCK_SIZE, n			// A22
+		);
+
+		delete[] A;
+
+		Cholesky_Decomposition_recursive_block(A22_red, L, n - BLOCK_SIZE, A_full, n_full,
+							L_begin_i + BLOCK_SIZE, L_begin_j + BLOCK_SIZE);
+	}
+}
 
 void Cholesky_Decomposition(double *A, double *L, int n)
 {
@@ -670,65 +761,45 @@ void Cholesky_Decomposition(double *A, double *L, int n)
 	//	Cholesky_Decomposition_line(A, L, n);
 	//	return;
 	//}
-	if (n <= BLOCK_SIZE ) {
-			//Cholesky_Decomposition_line(A, L, n);
-			Cholesky_Decomposition_line_block(A, L, n, 0, 0, n);
-			return;
+	if (n <= BLOCK_SIZE) {
+		//Cholesky_Decomposition_line(A, L, n);
+		Cholesky_Decomposition_line(A, L, n);
+		return;
 	}
-
+	L11T_global = new double[BLOCK_SIZE * BLOCK_SIZE];
+	L11T_inverse_global = new double[BLOCK_SIZE * BLOCK_SIZE];
+	adj_tmp_global = new double[BLOCK_SIZE * BLOCK_SIZE];
+	inverse_adj_global = new double[BLOCK_SIZE * BLOCK_SIZE];
+	det_global = new double[BLOCK_SIZE * BLOCK_SIZE];
 	// FIRST
-	Cholesky_Decomposition_line_block(A, L, BLOCK_SIZE, 0, 0, n);
+	Cholesky_Decomposition_line_block(A, L, BLOCK_SIZE,
+					0, 0, n,
+					0, 0, n);
 
 
 	// SECOND
-	Cholesky_Solve_Second_Iteration_block(A, L, L, n, BLOCK_SIZE, 
-						0 ,0, n,		// L11
-						BLOCK_SIZE, 0, n	// L21, A21
-						);
+	Cholesky_Solve_Second_Iteration_block(A, L, L, n, BLOCK_SIZE,
+		0, 0, n,		// L11
+		BLOCK_SIZE, 0, n,	// L21
+		BLOCK_SIZE, 0, n	// A21
+	);
 
 
 	double *A22_red = new double[(n - BLOCK_SIZE) * (n - BLOCK_SIZE)];
-	/*double *A22 = new double[(n - BLOCK_SIZE) * (n - BLOCK_SIZE)];
-	double *L21 = new double[(n - BLOCK_SIZE) * (BLOCK_SIZE)];
-	for (size_t i = 0; i < n - BLOCK_SIZE; i++) {
-		for (size_t j = 0; j < BLOCK_SIZE; j++) {
-			MATRIX(L21, i, j, BLOCK_SIZE) = BLOCK_MATRIX(L, i, j, BLOCK_SIZE, 0, n);
-		}
-	}
-	for (size_t i = 0; i < n - BLOCK_SIZE; i++) {
-		for (size_t j = 0; j < n - BLOCK_SIZE; j++) {
-			MATRIX(A22, i, j, n - BLOCK_SIZE) = BLOCK_MATRIX(A, i, j, BLOCK_SIZE, BLOCK_SIZE, n);
-			cout << MATRIX(A22, i, j, n - BLOCK_SIZE) << ", ";
-		}
-		cout << endl;
-	}
-	Cholesky_Find_Reduced_Matrix(A22_red, A22, L21, n, BLOCK_SIZE);*/
 
 	// THIRD
 	Cholesky_Find_Reduced_Matrix_block(A22_red, A, L, n, BLOCK_SIZE,
-						BLOCK_SIZE, 0, n,		// L21
-						BLOCK_SIZE, BLOCK_SIZE, n	// A22
-						);
+		BLOCK_SIZE, 0, n,		// L21
+		BLOCK_SIZE, BLOCK_SIZE, n	// A22
+	);
 
-	double *L22_red = new double[(n - BLOCK_SIZE) * (n - BLOCK_SIZE)];
-	memset(L22_red, 0, sizeof(double) * (n - BLOCK_SIZE) * (n - BLOCK_SIZE));
-	Cholesky_Decomposition(A22_red, L22_red, n - BLOCK_SIZE);
-	size_t k = 0, l = 0;
-	for (size_t i = BLOCK_SIZE; i < n; i++) {
-		for (size_t j = BLOCK_SIZE; j < n; j++) {
-			MATRIX(L, i, j, n) = MATRIX(L22_red, l, k, n - BLOCK_SIZE);
-			k++;
-		}
-		k = 0;
-		l++;
-	}
-
-	delete[] L22_red, A22_red;
+	Cholesky_Decomposition_recursive_block(A22_red, L, n - BLOCK_SIZE, A, n, BLOCK_SIZE, BLOCK_SIZE);
+	delete[] L11T_global, L11T_inverse_global, adj_tmp_global, inverse_adj_global, det_global;
 }
 
 int main(char **argv, int argc)
 {
-	Matrix<double> matrix_obj(6), matrix_res(6), matrix_check(6);
+	Matrix<double> matrix_obj(10), matrix_res(10), matrix_check(10);
 	size_t dim = matrix_obj.get_dimension();
 	double *matrix = matrix_obj.get_1d_array();
 	double *result = new double[dim * dim], *result_check = new double[dim * dim], *result_t = new double[dim * dim];
