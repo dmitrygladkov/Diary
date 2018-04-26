@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <iterator>
 #include <cassert>
+#include <climits>
+#include <cstring>
 
 #include <omp.h>
 
@@ -143,20 +145,6 @@ void Matrix<T>::generate_sym_pos_def_matrix_method2(void)
 }
 
 template <typename T>
-void Matrix<T>::matrix_multiplication(T *res_matrix, T *left_matrix, T *right_matrix, size_t dim)
-{
-	Matrix_Multiplication(res_matrix, left_matrix, right_matrix, dim);
-	copy_from(res_matrix, dim);
-}
-
-template <typename T>
-static inline
-void Matrix_Multiplication(T *res_matrix, T *left_matrix, T *right_matrix, int dim)
-{
-	Matrix_Multiplication_Rect(res_matrix, left_matrix, right_matrix, dim, dim, dim, dim);
-}
-
-template <typename T>
 static inline
 void Matrix_Multiplication_Rect(T *res_matrix, T *left_matrix, T *right_matrix, int left_dim1, int left_dim2, int right_dim1, int right_dim2)
 {
@@ -170,6 +158,20 @@ void Matrix_Multiplication_Rect(T *res_matrix, T *left_matrix, T *right_matrix, 
 				(MATRIX(left_matrix, i, k, left_dim2) * MATRIX(right_matrix, k, j, right_dim2));
 		}
 	}
+}
+
+template <typename T>
+static inline
+void Matrix_Multiplication(T *res_matrix, T *left_matrix, T *right_matrix, int dim)
+{
+	Matrix_Multiplication_Rect(res_matrix, left_matrix, right_matrix, dim, dim, dim, dim);
+}
+
+template <typename T>
+void Matrix<T>::matrix_multiplication(T *res_matrix, T *left_matrix, T *right_matrix, size_t dim)
+{
+	Matrix_Multiplication(res_matrix, left_matrix, right_matrix, dim);
+	copy_from(res_matrix, dim);
 }
 
 template <typename T>
@@ -212,12 +214,6 @@ void Matrix_Multiplication_Rect_res_left_block(T *res_matrix, T *left_matrix, T 
 	}
 }
 
-template <typename T>
-void Matrix<T>::matrix_transposition(T *matrix, size_t dim)
-{
-	Matrix_Transposition(matrix, dim);
-	copy_from(matrix, dim);
-}
 
 template <typename T>
 static inline
@@ -232,6 +228,13 @@ void Matrix_Transposition(T *matrix, size_t dim)
 			MATRIX(matrix, j, i, dim) = tmp;
 		}
 	}
+}
+
+template <typename T>
+void Matrix<T>::matrix_transposition(T *matrix, size_t dim)
+{
+	Matrix_Transposition(matrix, dim);
+	copy_from(matrix, dim);
 }
 
 template <typename T>
@@ -823,7 +826,7 @@ void Cholesky_Decomposition(double *A, double *L, int n)
 
 #define MATRIX_SIZE 10
 
-int main(char **argv, int argc)
+int main(int argc, char **argv)
 {
 	Matrix<double> matrix_obj(MATRIX_SIZE, 1), matrix_res(MATRIX_SIZE), matrix_res4(MATRIX_SIZE), matrix_res_seq(MATRIX_SIZE), matrix_check(MATRIX_SIZE);
 	size_t dim = matrix_obj.get_dimension();
