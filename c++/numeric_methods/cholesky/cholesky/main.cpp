@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <iterator>
 #include <cassert>
+#include <climits>
+#include <cstring>
 
 #include <omp.h>
 
@@ -20,6 +22,13 @@ using namespace std;
 #define SYSTEM(system, i, dim)		\
 	((system) + (i) * (dim))
 
+#ifndef BLOCK_SIZE
+#define BLOCK_SIZE 8
+#endif
+#ifndef MATRIX_SIZE
+#define MATRIX_SIZE 2000
+#endif
+
 template <typename T>
 class Matrix {
 public:
@@ -32,8 +41,8 @@ public:
 			generate_sym_pos_def_matrix_method1();
 		else
 			generate_sym_pos_def_matrix_method2();
-		if (check_sym_pos_def_matrix())
-			cerr << "Error! Matrix isn't symmetric and/or not positive definite" << endl;
+		//if (check_sym_pos_def_matrix())
+		//cerr << "Error! Matrix isn't symmetric and/or not positive definite" << endl;
 	}
 	size_t get_dimension() {
 		return dimension;
@@ -143,20 +152,6 @@ void Matrix<T>::generate_sym_pos_def_matrix_method2(void)
 }
 
 template <typename T>
-void Matrix<T>::matrix_multiplication(T *res_matrix, T *left_matrix, T *right_matrix, size_t dim)
-{
-	Matrix_Multiplication(res_matrix, left_matrix, right_matrix, dim);
-	copy_from(res_matrix, dim);
-}
-
-template <typename T>
-static inline
-void Matrix_Multiplication(T *res_matrix, T *left_matrix, T *right_matrix, int dim)
-{
-	Matrix_Multiplication_Rect(res_matrix, left_matrix, right_matrix, dim, dim, dim, dim);
-}
-
-template <typename T>
 static inline
 void Matrix_Multiplication_Rect(T *res_matrix, T *left_matrix, T *right_matrix, int left_dim1, int left_dim2, int right_dim1, int right_dim2)
 {
@@ -170,6 +165,20 @@ void Matrix_Multiplication_Rect(T *res_matrix, T *left_matrix, T *right_matrix, 
 				(MATRIX(left_matrix, i, k, left_dim2) * MATRIX(right_matrix, k, j, right_dim2));
 		}
 	}
+}
+
+template <typename T>
+static inline
+void Matrix_Multiplication(T *res_matrix, T *left_matrix, T *right_matrix, int dim)
+{
+	Matrix_Multiplication_Rect(res_matrix, left_matrix, right_matrix, dim, dim, dim, dim);
+}
+
+template <typename T>
+void Matrix<T>::matrix_multiplication(T *res_matrix, T *left_matrix, T *right_matrix, size_t dim)
+{
+	Matrix_Multiplication(res_matrix, left_matrix, right_matrix, dim);
+	copy_from(res_matrix, dim);
 }
 
 template <typename T>
@@ -212,12 +221,6 @@ void Matrix_Multiplication_Rect_res_left_block(T *res_matrix, T *left_matrix, T 
 	}
 }
 
-template <typename T>
-void Matrix<T>::matrix_transposition(T *matrix, size_t dim)
-{
-	Matrix_Transposition(matrix, dim);
-	copy_from(matrix, dim);
-}
 
 template <typename T>
 static inline
@@ -232,6 +235,13 @@ void Matrix_Transposition(T *matrix, size_t dim)
 			MATRIX(matrix, j, i, dim) = tmp;
 		}
 	}
+}
+
+template <typename T>
+void Matrix<T>::matrix_transposition(T *matrix, size_t dim)
+{
+	Matrix_Transposition(matrix, dim);
+	copy_from(matrix, dim);
 }
 
 template <typename T>
@@ -722,8 +732,6 @@ void Cholesky_Decomposition_line_block(double *A, double *L, int n,
 	}
 }
 
-static int BLOCK_SIZE = 8;
-
 static inline
 void Cholesky_Decomposition_recursive_block(double *A, double *L, int n,
 						double *A_full, int n_full,
@@ -821,71 +829,64 @@ void Cholesky_Decomposition(double *A, double *L, int n)
 	delete[] L11T_preallocated, L11T_inverse_preallocated;
 }
 
-#define MATRIX_SIZE 10
-
-int main(char **argv, int argc)
+int main(int argc, char **argv)
 {
-	Matrix<double> matrix_obj(MATRIX_SIZE, 1), matrix_res(MATRIX_SIZE), matrix_res4(MATRIX_SIZE), matrix_res_seq(MATRIX_SIZE), matrix_check(MATRIX_SIZE);
+	int max_omp_threads = omp_get_max_threads();
+	Matrix<double> matrix_obj(MATRIX_SIZE, 1), matrix_res(MATRIX_SIZE),
+			matrix_res_seq(MATRIX_SIZE), matrix_check(MATRIX_SIZE);
 	size_t dim = matrix_obj.get_dimension();
 	double *matrix = matrix_obj.get_1d_array();
-	double *result = new double[dim * dim], *result4 = new double[dim * dim], *result_check = new double[dim * dim], *result_t = new double[dim * dim];
+	double *result = new double[dim * dim], *result_check = new double[dim * dim],
+		*result_t = new double[dim * dim];
 	double *result_seq = new double[dim * dim];
-	double start_time_parallel2, start_time_parallel4, start_time_seq, diff_time_parallel2, diff_time_parallel4, diff_time_seq;
+	double *start_time = new double[max_omp_threads + 1];
+	double *diff_time = new double[max_omp_threads + 1];
+	double *speedup = new double[max_omp_threads + 1];
+	double *efficiency = new double[max_omp_threads + 1];
 
 	memset(result, 0, sizeof(double) * dim * dim);
-	memset(result4, 0, sizeof(double) * dim * dim);
 	memset(result_seq, 0, sizeof(double) * dim * dim);
 
 	if (MATRIX_SIZE <= 10) {
 		cout << matrix_obj << endl;
 	}
 
-	omp_set_num_threads(2);
-	start_time_parallel2 = omp_get_wtime();
-	Cholesky_Decomposition(matrix, result, dim);
-	diff_time_parallel2 = omp_get_wtime() - start_time_parallel2;
-	matrix_res.set_1d_array(result);
-
-	omp_set_num_threads(4);
-	start_time_parallel4 = omp_get_wtime();
-	Cholesky_Decomposition(matrix, result4, dim);
-	diff_time_parallel4 = omp_get_wtime() - start_time_parallel4;
-	matrix_res4.set_1d_array(result4);
-
-	start_time_seq = omp_get_wtime();
+	omp_set_num_threads(1);
+	start_time[0] = omp_get_wtime();
 	Cholesky_Decomposition_line(matrix, result_seq, dim);
-	diff_time_seq = omp_get_wtime() - start_time_seq;
+	diff_time[0] = omp_get_wtime() - start_time[0];
+	speedup[0] = 1;
+	efficiency[0] = speedup[0] / 1;
+
 	matrix_res_seq.set_1d_array(result_seq);
-
-	Matrix_Transposition_Rect(result_t, result, dim, dim);
-	Matrix_Multiplication(result_check, result, result_t, dim);
-	matrix_check.set_1d_array(result_check);
-
-	cout << "Result (parallel 2 threads):" << endl;
-	if (MATRIX_SIZE <= 10) {
-		cout << matrix_res << endl;
-	}
-	cout << "Run time - " << diff_time_parallel2 << endl;
-	cout << "Speedup - " << diff_time_seq / diff_time_parallel2 << endl;
-	cout << "Efficiency - " << diff_time_seq / diff_time_parallel2 / 2 << endl;
-
-	cout << endl << endl << endl;
-
-	cout << "Result (parallel 4 threads):" << endl;
-	if (MATRIX_SIZE <= 10) {
-		cout << matrix_res << endl;
-	}
-	cout << "Run time - " << diff_time_parallel4 << endl;
-	cout << "Speedup - " << diff_time_seq / diff_time_parallel4 << endl;
-	cout << "Efficiency - " << diff_time_seq / diff_time_parallel4 / 4 << endl;
-
-	cout << endl << endl << endl;
 
 	cout << "Result (sequential):" << endl;
 	if (MATRIX_SIZE <= 10) {
 		cout << matrix_res_seq << endl;
 	}
-	cout << "Run time - " << diff_time_seq << endl;
+	cout << "Run time - " << diff_time[0] << " ";
+	cout << "Speedup - " << speedup[0] << " ";
+	cout << "Efficiency - " << efficiency[0] << endl;
+
+	for (int i = 1; i < max_omp_threads + 1; i++) {
+		omp_set_num_threads(i);
+		//cout << "Result (parallel " << i <<  " threads):" << endl;
+		memset(result, 0, sizeof(double) * dim * dim);
+		start_time[i] = omp_get_wtime();
+		Cholesky_Decomposition(matrix, result, dim);
+		diff_time[i] = omp_get_wtime() - start_time[i];
+		speedup[i] = diff_time[0] / diff_time[i];
+		efficiency[i] = speedup[i] / i;
+		cout << diff_time[i] << ", ";
+		cout << speedup[i] << ", ";
+		cout << efficiency[i];
+		cout << endl;
+	}
+	matrix_res.set_1d_array(result);
+
+	Matrix_Transposition_Rect(result_t, result, dim, dim);
+	Matrix_Multiplication(result_check, result, result_t, dim);
+	matrix_check.set_1d_array(result_check);
 
 	cout << endl << endl << endl;
 
@@ -907,7 +908,7 @@ int main(char **argv, int argc)
 	else
 		cout << "Parallel Cholesky algorithm isn't correct" << endl;
 
-	delete[] result, result4, result_check, result_t, result_seq;
+	delete[] result, result_check, result_t, result_seq;
 
 	getchar();
 }
