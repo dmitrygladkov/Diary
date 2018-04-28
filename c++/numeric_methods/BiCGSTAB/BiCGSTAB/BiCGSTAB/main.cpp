@@ -8,6 +8,8 @@
 #include <cassert>
 #include <vector>
 #include <numeric>
+#include <climits>
+#include <cstring>
 
 #include <omp.h>
 
@@ -100,7 +102,7 @@ class CRS_Matrix {
 	}
 public:
 	CRSMatrix crs;
-	CRS_Matrix(int dim = 10, vector<int> non_zero_row_elem_num = { 0, 1, 0, 1, 0, 0, 2, 0, 0, 3 }/*{ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 }*/)
+	CRS_Matrix(int dim = 10, vector<int> non_zero_row_elem_num = /*{ 0, 1, 0, 1, 0, 0, 2, 0, 0, 3 }*/{ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 })
 	{
 		crs.n = dim;
 		crs.m = dim;
@@ -380,7 +382,7 @@ int main(int argc, char **argv)
 {
 	int max_iter = 10, count = 10;
 	double eps = 0.001;
-	CRS_Matrix crs_matrix;
+	CRS_Matrix crs_matrix(3);
 	double *b = new double[crs_matrix.getDim()];
 	double *x = new double[crs_matrix.getDim()];
 
