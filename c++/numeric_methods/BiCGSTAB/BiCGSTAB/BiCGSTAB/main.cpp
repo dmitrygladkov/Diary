@@ -102,13 +102,31 @@ class CRS_Matrix {
 	}
 public:
 	CRSMatrix crs;
-	CRS_Matrix(int dim = 10, vector<int> non_zero_row_elem_num = /*{ 0, 1, 0, 1, 0, 0, 2, 0, 0, 3 }*/{ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 })
-	{
+	CRS_Matrix(double **matrix, int dim = 0) {
+		crs.n = dim;
+		crs.m = dim;
+		crs.nz = 0;
+		for (int r = 0; r < dim; r++) {
+			crs.rowPtr.push_back(crs.nz);
+			for (int c = 0; c < dim; c++) {
+
+				if (matrix[r][c] != 0) {
+					crs.colIndex.push_back(c);
+					crs.val.push_back(matrix[r][c]);
+
+					crs.nz++;
+				}
+			}
+		}
+		crs.rowPtr.push_back(crs.nz);
+	}
+
+	CRS_Matrix(int dim = 10, vector<int> non_zero_row_elem_num = { 0, 1, 0, 1, 0, 0, 2, 0, 0, 3 }) {
 		crs.n = dim;
 		crs.m = dim;
 
 		this->non_zero_row_elem_num = non_zero_row_elem_num;
-		while (non_zero_row_elem_num.size() < dim)
+		while (this->non_zero_row_elem_num.size() < dim)
 			this->non_zero_row_elem_num.push_back(0);
 
 		crs.nz = std::accumulate(non_zero_row_elem_num.begin(), non_zero_row_elem_num.end(), 0);
@@ -382,7 +400,7 @@ int main(int argc, char **argv)
 {
 	int max_iter = 10, count = 10;
 	double eps = 0.001;
-	CRS_Matrix crs_matrix(3);
+	CRS_Matrix crs_matrix(10, {});
 	double *b = new double[crs_matrix.getDim()];
 	double *x = new double[crs_matrix.getDim()];
 
@@ -399,4 +417,22 @@ int main(int argc, char **argv)
 	getchar();
 
 	delete[] b, x;
+	
+	/*double **mat = new double*[3];
+	for (int i = 0; i < 3; i++) {
+		mat[i] = new double[3];
+		for (int j = 0; j < 3; j++) {
+			mat[i][j] = 0;
+		}
+	}
+	mat[0][1] = 1;
+	mat[0][2] = 1;
+	mat[1][2] = 5;
+	mat[2][1] = 2;
+	mat[2][2] = 3;
+	CRS_Matrix crs_matrix((double**)mat, 3);
+
+	cout << crs_matrix;
+
+	getchar();*/
 }
