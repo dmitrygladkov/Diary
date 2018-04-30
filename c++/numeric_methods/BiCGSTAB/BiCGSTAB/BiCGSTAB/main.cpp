@@ -35,18 +35,39 @@ static inline double getCRSElem(const CRSMatrix &crs, int i, int j)
 
 static inline void showCRSMatrix(const CRSMatrix &crs)
 {
-	for (int i = 0; i < crs.m; i++) {
-		for (int j = 0; j < crs.n; j++) {
-			cout << setw(10) << getCRSElem(crs, i, j) << " ";
+	if (crs.n <= 10) {
+		for (int i = 0; i < crs.m; i++) {
+			for (int j = 0; j < crs.n; j++) {
+				cout << setw(10) << getCRSElem(crs, i, j) << " ";
+			}
+			cout << endl;
 		}
-		cout << endl;
 	}
 }
 
 static inline void showVector(double *vector, int size_vector)
 {
-	for (int i = 0; i < size_vector; i++)
-		cout << setw(10) << vector[i] << " ";
+	if (size_vector <= 10) {
+		for (int i = 0; i < size_vector; i++)
+			cout << setw(10) << vector[i] << " ";
+	}
+}
+
+static inline void transposeMatrix(double **result, double **matrix, int dim)
+{
+	for (int i = 0; i < dim; i++)
+		for (int j = 0; j < dim; j++)
+			result[i][j] = matrix[j][i];
+}
+
+static inline void multMatrix(double **result, double **mat1, double **mat2, int dim)
+{
+	for (int i = 0; i < dim; i++)
+		for (int j = 0; j < dim; j++) {
+			result[i][j] = 0;
+			for (size_t k = 0; k < dim; k++)
+				result[i][j] += mat1[i][k] * mat2[k][j];
+		}
 }
 
 class CRS_Matrix {
@@ -100,9 +121,7 @@ class CRS_Matrix {
 		}
 		crs.rowPtr[crs.n] = c;
 	}
-public:
-	CRSMatrix crs;
-	CRS_Matrix(double **matrix, int dim = 0) {
+	inline void convertMatrixToCRSMatrix(double **matrix, int dim) {
 		crs.n = dim;
 		crs.m = dim;
 		crs.nz = 0;
@@ -120,8 +139,76 @@ public:
 		}
 		crs.rowPtr.push_back(crs.nz);
 	}
+	inline double **generateMatrix(int dim, double alpha)
+	{
+		double **matrix = new double*[dim];
+		std::random_device rd;
+		std::mt19937 gen(rd());
+		std::uniform_real_distribution<> dis(0, 1);
 
-	CRS_Matrix(int dim = 10, vector<int> non_zero_row_elem_num = { 0, 1, 0, 1, 0, 0, 2, 0, 0, 3 }) {
+		for (int i = 0; i < dim; i++) {
+			matrix[i] = new double[dim];
+			for (int j = 0; j < dim; j++) {
+				double tmp = dis(gen);
+				matrix[i][j] = ((tmp < alpha) ? 0 : tmp);
+			}
+		}
+
+		double **tr_matrix = new double*[dim];
+		for (int i = 0; i < dim; i++)
+			tr_matrix[i] = new double[dim];
+		transposeMatrix(tr_matrix, matrix, dim);
+
+		double **mult_matrix = new double*[dim];
+		for (int i = 0; i < dim; i++)
+			mult_matrix[i] = new double[dim];
+		multMatrix(mult_matrix, matrix, tr_matrix, dim);
+
+		delete[] matrix, tr_matrix;
+
+		return mult_matrix;
+	}
+public:
+	CRSMatrix crs;
+	CRS_Matrix(int dim, double alpha, int method = 1)
+	{
+		double **matrix;
+
+		if (method == 2) {
+			matrix = generateMatrix(dim, alpha);
+		} else {
+			std::random_device rd;
+			std::mt19937 gen(rd());
+			std::uniform_real_distribution<> dis(0, 1);
+
+			matrix = new double*[dim];
+			for (int i = 0; i < dim; i++) {
+				matrix[i] = new double[dim];
+				memset(matrix[i], 0, sizeof(double) * dim);
+			}
+
+
+			for (int i = 0; i < dim; i++) {
+				for (int j = 0; j < i; j++)
+					matrix[i][i] += matrix[j][i];
+				for (int j = i + 1; j < dim; j++) {
+					double tmp = dis(gen);
+					matrix[i][i] += matrix[j][i] = matrix[i][j] =
+						((tmp < alpha) ? 0 : tmp);
+				}
+			}
+		}
+		convertMatrixToCRSMatrix(matrix, dim);
+
+		delete[] matrix;
+	}
+	CRS_Matrix(double **matrix, int dim = 0)
+	{
+		convertMatrixToCRSMatrix(matrix, dim);
+	}
+
+	CRS_Matrix(int dim = 10, vector<int> non_zero_row_elem_num = { 0, 1, 0, 1, 0, 0, 2, 0, 0, 3 })
+	{
 		crs.n = dim;
 		crs.m = dim;
 
@@ -138,7 +225,8 @@ public:
 		generateCRSMatrix();
 	}
 
-	~CRS_Matrix() {
+	~CRS_Matrix()
+	{
 		crs.n = crs.m = crs.nz = 0;
 		crs.val.clear();
 		crs.colIndex.clear();
@@ -162,11 +250,13 @@ public:
 private:
 	friend ostream& operator<<(ostream& os, const CRS_Matrix& obj)
 	{
-		for (int i = 0; i < obj.crs.m; i++) {
-			for (int j = 0; j < obj.crs.n; j++) {
-				os << setw(10) << getCRSElem(obj.crs, i, j) << " ";
+		if (obj.crs.m <= 10) {
+			for (int i = 0; i < obj.crs.m; i++) {
+				for (int j = 0; j < obj.crs.n; j++) {
+					os << setw(10) << getCRSElem(obj.crs, i, j) << " ";
+				}
+				os << endl;
 			}
-			os << endl;
 		}
 		return os;
 	}
@@ -239,7 +329,8 @@ static inline void multiplicationVectorScalar(double *vector, int size_vector, d
 
 static inline bool isEqual(double x, double y, double eps)
 {
-	return (fabs(x - y) < eps) ? true : false;
+	/*return (fabs(x - y) < eps) ? true : false;*/
+	return (fabs((int)x - (int)y) == 0) ? true : false;
 }
 
 static inline bool isNotEqual(double x, double y, double eps)
@@ -247,7 +338,7 @@ static inline bool isNotEqual(double x, double y, double eps)
 	return !isEqual(x, y, eps);
 }
 
-static inline void checkResult(const CRSMatrix &crs_matrix, double *b, double *x, double eps) {
+static inline bool checkResult(const CRSMatrix &crs_matrix, double *b, double *x, double eps) {
 	double *check_vector = new double[crs_matrix.n];
 
 	multiplicationCRSMatrixVector(crs_matrix, x, check_vector);
@@ -287,6 +378,8 @@ static inline void checkResult(const CRSMatrix &crs_matrix, double *b, double *x
 		cout << "Failed" << endl;
 
 	delete[] check_vector;
+
+	return fcheck;
 }
 
 void SLE_Solver_CRS_BICG(CRSMatrix &A, double *b, double eps, int max_iter, double *x, int &count) {
@@ -396,11 +489,14 @@ void SLE_Solver_CRS_BICG(CRSMatrix &A, double *b, double eps, int max_iter, doub
 	delete[] multAtbiP;
 }
 
+#define SIZE_MATIRX	1000
+#define ALGO_ITER	10000
+
 int main(int argc, char **argv)
 {
-	int max_iter = 10, count = 10;
+	/*int max_iter = 10, count = 10;
 	double eps = 0.001;
-	CRS_Matrix crs_matrix(10, {});
+	CRS_Matrix crs_matrix(10);
 	double *b = new double[crs_matrix.getDim()];
 	double *x = new double[crs_matrix.getDim()];
 
@@ -416,7 +512,7 @@ int main(int argc, char **argv)
 
 	getchar();
 
-	delete[] b, x;
+	delete[] b, x;*/
 	
 	/*double **mat = new double*[3];
 	for (int i = 0; i < 3; i++) {
@@ -435,4 +531,84 @@ int main(int argc, char **argv)
 	cout << crs_matrix;
 
 	getchar();*/
+
+	/*int max_iter = 10000, count = 10000;
+	double eps = 0.00001;
+	CRS_Matrix crs_matrix(1000, 0.7);
+
+	cout << crs_matrix;
+
+	double *b = new double[crs_matrix.getDim()];
+	double *x = new double[crs_matrix.getDim()];
+
+	memset(x, 0, sizeof(double) * crs_matrix.getDim());
+	initVector(b, crs_matrix.getDim(), UCHAR_MAX);
+
+	SLE_Solver_CRS_BICG(crs_matrix.crs, b, eps, max_iter, x, count);
+
+	cout << endl;
+
+	checkResult(crs_matrix.crs, b, x, eps);
+
+	getchar();*/
+
+	int max_omp_threads = omp_get_max_threads();
+
+	double *start_time = new double[max_omp_threads + 1];
+	double *diff_time = new double[max_omp_threads + 1];
+	double *speedup = new double[max_omp_threads + 1];
+	double *efficiency = new double[max_omp_threads + 1];
+	int max_iter = ALGO_ITER, count = 0;
+	double eps = 0.00001;
+
+
+	CRS_Matrix crs_matrix(SIZE_MATIRX, 0.7);
+
+	cout << crs_matrix;
+
+	double *b = new double[crs_matrix.getDim()];
+	double *x = new double[crs_matrix.getDim()];
+
+	memset(x, 0, sizeof(double) * crs_matrix.getDim());
+	initVector(b, crs_matrix.getDim(), UCHAR_MAX);
+
+	omp_set_num_threads(1);
+
+	start_time[0] = omp_get_wtime();
+	SLE_Solver_CRS_BICG(crs_matrix.crs, b, eps, max_iter, x, count);
+	diff_time[0] = omp_get_wtime() - start_time[0];
+
+	if (!checkResult(crs_matrix.crs, b, x, eps))
+		return EXIT_FAILURE;
+
+	speedup[0] = 1;
+	efficiency[0] = speedup[0] / 1;
+
+	cout << "Run time " << " ";
+	cout << "Speedup " << " ";
+	cout << "Efficiency " << endl;
+
+	for (int i = 1; i < max_omp_threads + 1; i++) {
+		omp_set_num_threads(i);
+		//cout << "Result (parallel " << i <<  " threads):" << endl;
+		memset(x, 0, sizeof(double) * crs_matrix.getDim());
+		
+		start_time[i] = omp_get_wtime();
+		SLE_Solver_CRS_BICG(crs_matrix.crs, b, eps, max_iter, x, count);
+		diff_time[i] = omp_get_wtime() - start_time[i];
+		
+		speedup[i] = diff_time[0] / diff_time[i];
+		efficiency[i] = speedup[i] / i;
+
+		cout << diff_time[i] << ", ";
+		cout << speedup[i] << ", ";
+		cout << efficiency[i];
+		cout << endl;
+	}
+
+	delete[] start_time, diff_time, speedup, efficiency;
+
+	getchar();
+
+	return EXIT_SUCCESS;
 }
