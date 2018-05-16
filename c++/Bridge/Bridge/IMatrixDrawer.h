@@ -35,7 +35,7 @@ public:
 	}
 	virtual  void DrawCell(int i, int j, int val)
 	{
-		cout << "ConsoleMatrixDrawer::DrawCell" << i << ", " << j  <<" - " << val << endl;
+		cout << "ConsoleMatrixDrawer::DrawCell " << i << ", " << j  <<" - " << val << endl;
 	}
 	virtual ~ConsoleMatrixDrawer()
 	{
@@ -59,7 +59,7 @@ public:
 	}
 	virtual  void DrawCell(int i, int j, int val)
 	{
-		cout << "GraphMatrixDrawer::DrawCell" << i << ", " << j << " - " << val << endl;
+		cout << "GraphMatrixDrawer::DrawCell " << i << ", " << j << " - " << val << endl;
 	}
 	virtual ~GraphMatrixDrawer()
 	{
@@ -83,7 +83,7 @@ public:
 	}
 	virtual  void DrawCell(int i, int j, int val)
 	{
-		cout << "HTMLMatrixDrawer::DrawCell" << i << ", " << j << " - " << val << endl;
+		cout << "HTMLMatrixDrawer::DrawCell " << i << ", " << j << " - " << val << endl;
 	}
 	virtual ~HTMLMatrixDrawer()
 	{

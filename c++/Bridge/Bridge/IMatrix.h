@@ -2,8 +2,7 @@
 
 #include "IMatrixDrawer.h"
 
-class IMatrix
-{
+class IMatrix {
 public:
 	IMatrix(IMatrixDrawer *drawer)
 	{
@@ -61,5 +60,59 @@ public:
 	virtual ~SparseMatrix()
 	{
 		cout << "destructor SparseMatrix" << endl;
+	}
+};
+
+class MinorMatrix : public IMatrix {
+public:
+	IMatrix *super;
+	MinorMatrix(IMatrix *matrix_decorator) : IMatrix(matrix_decorator->drawer)
+	{
+		super = matrix_decorator;
+		cout << "constructor MinorMatrix" << endl;
+	}
+	void Draw(int weight, int height) {
+		cout << "MinorMatrix::Draw" << endl;
+		super->Draw(weight, height);
+	}
+	virtual ~MinorMatrix()
+	{
+		cout << "destructor MinorMatrix" << endl;
+	}
+};
+
+class TransposeMatrix : public IMatrix {
+public:
+	IMatrix * super;
+	TransposeMatrix(IMatrix *matrix_decorator) : IMatrix(matrix_decorator->drawer)
+	{
+		super = matrix_decorator;
+		cout << "constructor TransposeMatrix" << endl;
+	}
+	void Draw(int weight, int height) {
+		cout << "TransposeMatrix::Draw" << endl;
+		super->Draw(weight, height);
+	}
+	virtual ~TransposeMatrix()
+	{
+		cout << "destructor TransposeMatrix" << endl;
+	}
+};
+
+class NullAboveMainDiagonalMatrix : public IMatrix {
+public:
+	IMatrix * super;
+	NullAboveMainDiagonalMatrix(IMatrix *matrix_decorator) : IMatrix(matrix_decorator->drawer)
+	{
+		super = matrix_decorator;
+		cout << "constructor NullAboveMainDiagonalMatrix" << endl;
+	}
+	void Draw(int weight, int height) {
+		cout << "NullAboveMainDiagonalMatrix::Draw" << endl;
+		super->Draw(weight, height);
+	}
+	virtual ~NullAboveMainDiagonalMatrix()
+	{
+		cout << "destructor NullAboveMainDiagonalMatrix" << endl;
 	}
 };
