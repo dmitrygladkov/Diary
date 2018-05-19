@@ -82,54 +82,6 @@ void solve(double* a, double* b, double* c, double* d, int n) {
 	}
 }
 
-static inline
-void cycle_reduction_method(
-	double *x, double a_0, double a_1, double a_2,
-	double *a, double *b, double *c, double *f,
-	int n, int q)
-{
-	a[0] = a_0;
-	b[0] = a_1;
-	c[0] = a_2;
-	f[0] = 0;
-	f[n] = 0;
-	x[0] = 0;
-	x[n] = 0;
-	int start = 2, elementsNum = n, step = 1;
-
-	for (int j = 0; j <= q - 1; j++) {
-		double alpha = - a[j] / b[j];
-		double beta = - c[j] / b[j];
-		a[j + 1] = alpha * a[j];
-		b[j + 1] = b[j] + 2 * alpha * c[j];
-		c[j + 1] = beta * c[j];
-		elementsNum = (elementsNum - 1) / 2;
-		for (int i = 0; i <= elementsNum; i++) {
-			int k = start * (i + 1);
-			f[k] = alpha * f[k - step] + f[k] + beta * f[k + step];
-		}
-		start = 2 * start;
-		step = 2 * step;
-	}
-
-	start = n / 2;
-	step = start;
-	elementsNum = 1;
-	for (int j = q - 1; j <= 0; j++) {
-		double alpha = -a[j] / b[j];
-		double beta = -c[j] / b[j];
-		for (int i = 0; i <= elementsNum; i++) {
-			int k = start * (2 * i + 1);
-			x[k] = f[k] / b[j] +
-				alpha * x[k - step] +
-				beta * x[k + step];
-		}
-		start = start / 2;
-		step = start;
-		elementsNum = elementsNum * 2;
-	}
-}
-
 void heat_equation_crank_nicolson(heat_task task, double *v)
 {
 	double h = task.L / task.n;
@@ -153,28 +105,25 @@ void heat_equation_crank_nicolson(heat_task task, double *v)
 			func[j][i] = tao * task.f(i * h, (j + 0.5) * tao);
 	}
 
-	for (int j = 0; j < task.m; ++j) {
-		double *a = new double[task.n + 1];
-		double *b = new double[task.n + 1];
-		double *c = new double[task.n + 1];
-		double *right = new double[task.n + 1];
+	for (int j = 1; j <= task.m; ++j) {
+		double *a = new double[task.n - 1];
+		double *b = new double[task.n - 1];
+		double *c = new double[task.n - 1];
+		double *right = new double[task.n - 1];
 
-		right[0] = func[j][0];
-		for (int i = 0; i <= task.n; ++i) {
-			right[i] = (1 - tao / (h * h)) * G[j][i] + (tao / (2 * h * h)) * (G[j][i - 1] + G[j][i + 1]) + func[j][i];
+		for (int i = 1; i < task.n; ++i) {
+			right[i - 1] = (1 - tao / (h * h)) * G[j - 1][i] + (tao / (2 * h * h)) * (G[j - 1][i - 1] + G[j - 1][i + 1]) + func[j - 1][i];
 
-			a[i] = (tao / (2 * h * h));
-			b[i] = (1 - tao / (h * h));
-			c[i] = (tao / (2 * h * h));
+			a[i - 1] = c[i - 1] = (tao / (2 * h * h));
+			b[i - 1] = -(1 + tao / (h * h));
 		}
-		a[0] = 0;
-		c[task.n] = 0;
+
 		solve(a, b, c, right, task.n);
 		
 		/*cycle_reduction_method(G[i + 1], (1 + tao / (h * h)), tao / (2 * h * h),
 				       tao / (2 * h * h), a, b, c, func[i], task.n, sqrt(task.n));*/
-		for (int i = 0; i <= task.n; i++)
-			G[j + 1][i] = right[i];
+		for (int i = 0; i < task.n - 1; i++)
+			G[j][i + 1] = right[i];
 
 		delete[] a, b, c, right;
 	}
@@ -185,8 +134,8 @@ void heat_equation_crank_nicolson(heat_task task, double *v)
 
 int main(int argc, char **argv)
 {
-	heat_task task(10000, 10000, 4, 2);
-	double *v = new double[11];
+	heat_task task(10000, 10000, 1000, 1000);
+	double *v = new double[1001];
 	heat_equation_crank_nicolson(task, v);
 
 	for (int i = 0; i < task.n; i++) {
