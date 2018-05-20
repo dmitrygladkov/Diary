@@ -31,55 +31,190 @@ public:
 	double f(double x, double t) { return 0; }
 };
 
-void solve(double* a, double* b, double* c, double* d, int n) {
+double *cyclic_reduction_factor(int n, double a[])
+{
+	double *a_cr;
+	int iful;
+	int ifulp;
+	int ihaf;
+	int il;
+	int ilp;
+	int inc;
+	int incr;
+	int ipnt;
+	int ipntp;
+	int j;
+
+	a_cr = new double[3 * (2 * n + 1)];
+
+	if (n == 1) {
+		a_cr[0 + 0 * 3] = 0.0;
+		a_cr[0 + 1 * 3] = 0.0;
+		a_cr[0 + 2 * 3] = 0.0;
+		a_cr[1 + 0 * 3] = 0.0;
+		a_cr[1 + 1 * 3] = 1.0 / a[1 + 1 * 3];
+		a_cr[1 + 2 * 3] = 0.0;
+		a_cr[2 + 0 * 3] = 0.0;
+		a_cr[2 + 1 * 3] = 0.0;
+		a_cr[2 + 2 * 3] = 0.0;
+		return a_cr;
+	}
 	/*
-	// n is the number of unknowns
-
-	|b0 c0 0 ||x0| |d0|
-	|a1 b1 c1||x1|=|d1|
-	|0  a2 b2||x2| |d2|
-
-	1st iteration: b0x0 + c0x1 = d0 -> x0 + (c0/b0)x1 = d0/b0 ->
-
-	x0 + g0x1 = r0               where g0 = c0/b0        , r0 = d0/b0
-
-	2nd iteration:     | a1x0 + b1x1   + c1x2 = d1
-	from 1st it.: -| a1x0 + a1g0x1        = a1r0
-	-----------------------------
-	(b1 - a1g0)x1 + c1x2 = d1 - a1r0
-
-	x1 + g1x2 = r1               where g1=c1/(b1 - a1g0) , r1 = (d1 - a1r0)/(b1 - a1g0)
-
-	3rd iteration:      | a2x1 + b2x2   = d2
-	from 2nd it. : -| a2x1 + a2g1x2 = a2r2
-	-----------------------
-	(b2 - a2g1)x2 = d2 - a2r2
-	x2 = r2                      where                     r2 = (d2 - a2r2)/(b2 - a2g1)
-	Finally we have a triangular matrix:
-	|1  g0 0 ||x0| |r0|
-	|0  1  g1||x1|=|r1|
-	|0  0  1 ||x2| |r2|
-
-	Condition: ||bi|| > ||ai|| + ||ci||
-
-	in this version the c matrix reused instead of g
-	and             the d matrix reused instead of r and x matrices to report results
-	Written by Keivan Moradi, 2014
+	Zero out the workspace entries.
 	*/
-	n--; // since we start from x0 (not x1)
-	c[0] /= b[0];
-	d[0] /= b[0];
-
-	for (int i = 1; i < n; i++) {
-		c[i] /= b[i] - a[i] * c[i - 1];
-		d[i] = (d[i] - a[i] * d[i - 1]) / (b[i] - a[i] * c[i - 1]);
+	a_cr[0 + 0 * 3] = 0.0;
+	for (j = 1; j <= n - 1; j++) {
+		a_cr[0 + j * 3] = a[0 + j * 3];
+	}
+	for (j = n; j <= 2 * n; j++) {
+		a_cr[0 + j * 3] = 0.0;
 	}
 
-	d[n] = (d[n] - a[n] * d[n - 1]) / (b[n] - a[n] * c[n - 1]);
-
-	for (int i = n; i-- > 0;) {
-		d[i] -= c[i] * d[i + 1];
+	a_cr[1 + 0 * 3] = 0.0;
+	for (j = 1; j <= n; j++) {
+		a_cr[1 + j * 3] = a[1 + (j - 1) * 3];
 	}
+	for (j = n + 1; j <= 2 * n; j++) {
+		a_cr[1 + j * 3] = 0.0;
+	}
+	a_cr[2 + 0 * 3] = 0.0;
+	for (j = 1; j <= n - 1; j++) {
+		a_cr[2 + j * 3] = a[2 + (j - 1) * 3];
+	}
+	for (j = n; j <= 2 * n; j++) {
+		a_cr[2 + j * 3] = 0.0;
+	}
+
+	il = n;
+	ipntp = 0;
+
+	while (1 < il) {
+		ipnt = ipntp;
+		ipntp = ipntp + il;
+		if ((il % 2) == 1) {
+			inc = il + 1;
+		} else {
+			inc = il;
+		}
+
+		incr = inc / 2;
+		il = il / 2;
+		ihaf = ipntp + incr + 1;
+		ifulp = ipnt + inc + 2;
+
+		for (ilp = incr; 1 <= ilp; ilp--) {
+			ifulp = ifulp - 2;
+			iful = ifulp - 1;
+			ihaf = ihaf - 1;
+			a_cr[1 + iful * 3] = 1.0 / a_cr[1 + iful * 3];
+			a_cr[2 + iful * 3] = a_cr[2 + iful * 3] * a_cr[1 + iful * 3];
+			a_cr[0 + ifulp * 3] = a_cr[0 + ifulp * 3] * a_cr[1 + (ifulp + 1) * 3];
+			a_cr[1 + ihaf * 3] = a_cr[1 + ifulp * 3] - a_cr[0 + iful * 3] * a_cr[2 + iful * 3]
+				- a_cr[0 + ifulp * 3] * a_cr[2 + ifulp * 3];
+			a_cr[2 + ihaf * 3] = -a_cr[2 + ifulp * 3] * a_cr[2 + (ifulp + 1) * 3];
+			a_cr[0 + ihaf * 3] = -a_cr[0 + ifulp * 3] * a_cr[0 + (ifulp + 1) * 3];
+		}
+	}
+
+	a_cr[1 + (ipntp + 1) * 3] = 1.0 / a_cr[1 + (ipntp + 1) * 3];
+
+	return a_cr;
+}
+
+double *cyclic_reduction_solve(int n, double a_cr[], int nb, double b[])
+{
+	int i;
+	int iful;
+	int ifulm;
+	int ihaf;
+	int il;
+	int ipnt;
+	int ipntp;
+	int j;
+	int ndiv;
+	double *rhs;
+	double *x;
+
+	if (n == 1) {
+		x = new double[nb * n];
+		for (j = 0; j < nb; j++) {
+			x[0 + j * n] = a_cr[1 + 1 * 3] * b[0 + j * n];
+		}
+		return x;
+	}
+	//
+	//  Set up RHS.
+	//
+	rhs = new double[(2 * n + 1) * nb];
+
+	for (j = 0; j < nb; j++) {
+		rhs[0 + j * (2 * n + 1)] = 0.0;
+		for (i = 1; i <= n; i++) {
+			rhs[i + j * (2 * n + 1)] = b[i - 1 + j * n];
+		}
+		for (i = n + 1; i <= 2 * n; i++) {
+			rhs[i + j * (2 * n + 1)] = 0.0;
+		}
+	}
+
+	il = n;
+	ndiv = 1;
+	ipntp = 0;
+
+	while (1 < il) {
+		ipnt = ipntp;
+		ipntp = ipntp + il;
+		il = il / 2;
+		ndiv = ndiv * 2;
+
+		for (j = 0; j < nb; j++) {
+			ihaf = ipntp;
+			for (iful = ipnt + 2; iful <= ipntp; iful = iful + 2) {
+				ihaf = ihaf + 1;
+				rhs[ihaf + j * (2 * n + 1)] = rhs[iful + j * (2 * n + 1)]
+					- a_cr[2 + (iful - 1) * 3] * rhs[iful - 1 + j * (2 * n + 1)]
+					- a_cr[0 + iful * 3] * rhs[iful + 1 + j * (2 * n + 1)];
+			}
+		}
+	}
+
+	for (j = 0; j < nb; j++) {
+		rhs[ihaf + j * (2 * n + 1)] = rhs[ihaf + j * (2 * n + 1)] * a_cr[1 + ihaf * 3];
+	}
+
+	ipnt = ipntp;
+
+	while (0 < ipnt) {
+		ipntp = ipnt;
+		ndiv = ndiv / 2;
+		il = n / ndiv;
+		ipnt = ipnt - il;
+
+		for (j = 0; j < nb; j++) {
+			ihaf = ipntp;
+			for (ifulm = ipnt + 1; ifulm <= ipntp; ifulm = ifulm + 2) {
+				iful = ifulm + 1;
+				ihaf = ihaf + 1;
+				rhs[iful + j * (2 * n + 1)] = rhs[ihaf + j * (2 * n + 1)];
+				rhs[ifulm + j * (2 * n + 1)] = a_cr[1 + ifulm * 3] * (
+					rhs[ifulm + j * (2 * n + 1)]
+					- a_cr[2 + (ifulm - 1) * 3] * rhs[ifulm - 1 + j * (2 * n + 1)]
+					- a_cr[0 + ifulm * 3] * rhs[iful + j * (2 * n + 1)]);
+			}
+		}
+	}
+
+	x = new double[n * nb];
+
+	for (j = 0; j < nb; j++) {
+		for (i = 0; i < n; i++) {
+			x[i + j * n] = rhs[i + 1 + j * (2 * n + 1)];
+		}
+	}
+
+	free(rhs);
+
+	return x;
 }
 
 void heat_equation_crank_nicolson(heat_task task, double *v)
@@ -87,10 +222,9 @@ void heat_equation_crank_nicolson(heat_task task, double *v)
 	double h = task.L / task.n;
 	double tao = task.T / task.m;
 
-	double **G = new double*[task.m + 1], **func = new double*[task.n + 1];
+	double **G = new double*[task.m + 1];
 	for (int i = 0; i <= task.m; i++) {
 		G[i] = new double[task.n + 1];
-		func[i] = new double[task.n + 1];
 	}
 
 	for (int i = 0; i <= task.n; ++i) {
@@ -100,47 +234,66 @@ void heat_equation_crank_nicolson(heat_task task, double *v)
 		G[j][0] = task.left_condition(j * tao);
 		G[j][task.n] = task.right_condition(j * tao);
 	}
-	for (int j = 0; j <= task.m; ++j) {
-		for (int i = 0; i <= task.n; ++i)
-			func[j][i] = tao * task.f(i * h, (j + 0.5) * tao);
+
+	double ac_val;
+	double right_side_1_val, right_side_2_val;
+	double b_val;
+
+	double *a;
+	double *right;
+
+	if (task.n == 1) {
+		goto done;
 	}
+
+	ac_val = (tao / (2 * h * h));
+	right_side_1_val = (tao / (h * h) - 1);
+	right_side_2_val = (tao / (2 * h * h));
+	b_val = -(1 + tao / (h * h));
+
+	a = new double[3 * task.n - 1];
+	right = new double[task.n - 1];
 
 	for (int j = 1; j <= task.m; ++j) {
-		double *a = new double[task.n - 1];
-		double *b = new double[task.n - 1];
-		double *c = new double[task.n - 1];
-		double *right = new double[task.n - 1];
+
+		a[0 + 0 * 3] = 0.0;
+		a[1 + 0 * 3] = b_val;
 
 		for (int i = 1; i < task.n; ++i) {
-			right[i - 1] = (1 - tao / (h * h)) * G[j - 1][i] + (tao / (2 * h * h)) * (G[j - 1][i - 1] + G[j - 1][i + 1]) + func[j - 1][i];
+			right[i - 1] = right_side_1_val * G[j - 1][i] -
+				right_side_2_val * (G[j - 1][i - 1] + G[j - 1][i + 1]) +
+				tao * task.f((i - 1) * h, ((j - 1) + 0.5) * tao);
 
-			a[i - 1] = c[i - 1] = (tao / (2 * h * h));
-			b[i - 1] = -(1 + tao / (h * h));
+			/*a[i - 1] = c[i - 1] = (tao / (2 * h * h));
+			b[i - 1] = -(1 + tao / (h * h));*/
+			a[0 + (i - 1) * 3] = a[2 + (i - 1) * 3] = ac_val;
+			a[1 + (i - 1) * 3] = b_val;
 		}
 
-		solve(a, b, c, right, task.n);
-		
-		/*cycle_reduction_method(G[i + 1], (1 + tao / (h * h)), tao / (2 * h * h),
-				       tao / (2 * h * h), a, b, c, func[i], task.n, sqrt(task.n));*/
-		for (int i = 0; i < task.n - 1; i++)
-			G[j][i + 1] = right[i];
+		a[2 + (task.n - 2) * 3] = 0.0;
 
-		delete[] a, b, c, right;
+		double *a_cr = cyclic_reduction_factor(task.n - 1, a);
+		double *x = cyclic_reduction_solve(task.n - 1, a_cr, 1, right);
+
+		for (int i = 1; i < task.n; i++)
+			G[j][i] = x[i - 1];
+		delete[] a_cr, x;
 	}
-
+done:
 	for (int i = 0; i <= task.n; i++)
 		v[i] = G[task.m][i];
 }
 
 int main(int argc, char **argv)
 {
-	heat_task task(10000, 10000, 1000, 1000);
+	heat_task task(10000, 10000, 1024, 1024);
 	double *v = new double[1001];
 	heat_equation_crank_nicolson(task, v);
 
 	for (int i = 0; i < task.n; i++) {
 		cout << v[i] << " ";
 	}
+
 	getchar();
 
 	return 0;
