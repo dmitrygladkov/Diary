@@ -54,6 +54,7 @@ void cycle_reduction_method(
 		c[j + 1] = beta * c[j];
 
 		elementsNum = (elementsNum - 1) / 2;
+#pragma omp parallel for
 		for (int i = 0; i < elementsNum; i++) {
 			int k = start * (i + 1);
 			f[k] = alpha * f[k - step] + f[k] + beta * f[k + step];
@@ -61,12 +62,14 @@ void cycle_reduction_method(
 		start = 2 * start;
 		step = 2 * step;
 	}
+
 	start = n / 2;
 	step = start;
 	elementsNum = 1;
 	for (int j = q - 1; j >= 0; j--) {
 		double alpha = -a[j] / b[j];
 		double beta = -c[j] / b[j];
+#pragma omp parallel for
 		for (int i = 0; i < elementsNum; i++) {
 			int k = start * (2 * i + 1);
 			x[k] = f[k] / b[j] +
@@ -85,7 +88,7 @@ void heat_equation_crank_nicolson(heat_task task, double *v)
 	double tao = task.T / task.m;
 
 	double *G = new double[task.n + 1];
-
+#pragma omp parallel for
 	for (int i = 0; i <= task.n; ++i) {
 		G[i] = task.initial_condition(i * h);
 	}
@@ -106,21 +109,22 @@ void heat_equation_crank_nicolson(heat_task task, double *v)
 		double *right = new double[task.n + 1];
 
 		for (int j = 1; j <= task.m; ++j) {
-
+#pragma omp parallel for
 			for (int i = 2; i <= task.n; ++i) {
 				right[i - 1] = right_side_1_val * G[(i - 1)] -
-					right_side_2_val * (G[(i - 1) - 1] + G[(i - 1) + 1]) +
-					tao * task.f((i - 1) * h, 
+					right_side_2_val * (G[(i - 1) - 1] + G[(i - 1) + 1]) -
+					tao * task.f((i - 1) * h,
 						     ((j - 1) + 0.5) * tao);
 			}
-
+			right[1] -= task.left_condition((j) * tao) * (tao / (h * h * 2));
+			right[task.n - 1] -= task.right_condition((j) * tao) * (tao / (h * h * 2));
 			/* re-use G */
 			cycle_reduction_method(G, ac_val,
 				b_val, ac_val, a, b, c, right, task.n, log2(task.n));
 			G[0] = task.left_condition(j * tao);
 			G[task.n] = task.right_condition(j * tao);
 		}
-
+#pragma omp parallel for
 		for (int i = 0; i <= task.n; i++)
 			v[i] = G[i];
 
@@ -130,11 +134,26 @@ void heat_equation_crank_nicolson(heat_task task, double *v)
 
 int main(int argc, char **argv)
 {
-	heat_task task(10000, 10000, 2048, 8192);
+	/*heat_task task(10000, 10000, 8, 8);
 	double *v = new double[1001];
 	heat_equation_crank_nicolson(task, v);
-
 	for (int i = 0; i <= task.n; i++) {
+		cout << v[i] << " ";
+	}*/
+	int n = 8;
+	double *a = new double[log2(n) + 1];
+	double *b = new double[log2(n) + 1];
+	double *c = new double[log2(n) + 1];
+	double *right = new double[n + 1];
+	double *v = new double[n + 1];
+
+	for (int i = 1; i < n; i++)
+		right[i] = i;
+
+	cycle_reduction_method(v, -1,
+		2, 1, a, b, c, right, n, log2(n));
+
+	for (int i = 0; i <= n; i++) {
 		cout << v[i] << " ";
 	}
 
