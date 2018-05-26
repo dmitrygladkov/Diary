@@ -134,27 +134,43 @@ void heat_equation_crank_nicolson(heat_task task, double *v)
 
 int main(int argc, char **argv)
 {
-	/*heat_task task(10000, 10000, 8, 8);
+	int max_omp_threads = omp_get_max_threads();
+	double *start_time = new double[max_omp_threads + 1];
+	double *diff_time = new double[max_omp_threads + 1];
+	double *speedup = new double[max_omp_threads + 1];
+	double *efficiency = new double[max_omp_threads + 1];
+
+	heat_task task(10000, 10000, 1000, 1000);
 	double *v = new double[1001];
 	heat_equation_crank_nicolson(task, v);
 	for (int i = 0; i <= task.n; i++) {
 		cout << v[i] << " ";
-	}*/
-	int n = 8;
-	double *a = new double[log2(n) + 1];
-	double *b = new double[log2(n) + 1];
-	double *c = new double[log2(n) + 1];
-	double *right = new double[n + 1];
-	double *v = new double[n + 1];
+	
+	
+	omp_set_num_threads(1);
+	start_time[0] = omp_get_wtime();
+	heat_equation_crank_nicolson(task, v);
+	diff_time[0] = omp_get_wtime() - start_time[0];
+	speedup[0] = 1;
+	efficiency[0] = speedup[0] / 1;
 
-	for (int i = 1; i < n; i++)
-		right[i] = i;
+	cout << "Run time - " << diff_time[0] << " ";
+	cout << "Speedup - " << speedup[0] << " ";
+	cout << "Efficiency - " << efficiency[0] << endl;
 
-	cycle_reduction_method(v, -1,
-		2, 1, a, b, c, right, n, log2(n));
-
-	for (int i = 0; i <= n; i++) {
-		cout << v[i] << " ";
+	for (int i = 1; i < max_omp_threads + 1; i++) {
+		omp_set_num_threads(i);
+		//cout << "Result (parallel " << i <<  " threads):" << endl;
+		
+		start_time[i] = omp_get_wtime();
+		
+		diff_time[i] = omp_get_wtime() - start_time[i];
+		speedup[i] = diff_time[0] / diff_time[i];
+		efficiency[i] = speedup[i] / i;
+		cout << diff_time[i] << ", ";
+		cout << speedup[i] << ", ";
+		cout << efficiency[i];
+		cout << endl;
 	}
 
 	getchar();

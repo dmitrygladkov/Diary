@@ -330,7 +330,7 @@ static inline void multiplicationVectorScalar(double *vector, int size_vector, d
 static inline bool isEqual(double x, double y, double eps)
 {
 	/*return (fabs(x - y) < eps) ? true : false;*/
-	return (fabs((int)x - (int)y) == 0) ? true : false;
+    return (fabs((int)x - (int)y) < 2) ? true : false;
 }
 
 static inline bool isNotEqual(double x, double y, double eps)
@@ -347,6 +347,7 @@ static inline bool checkResult(const CRSMatrix &crs_matrix, double *b, double *x
 	for (int i = 0; i < crs_matrix.n; i++) {
 		if (isNotEqual(check_vector[i], b[i], eps)) {
 			fcheck = false;
+			cout << check_vector[i] << " != " << b[i] << endl;
 			break;
 		}
 	}
