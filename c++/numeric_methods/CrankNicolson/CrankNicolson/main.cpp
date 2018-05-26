@@ -10,12 +10,12 @@
 #include <numeric>
 #include <climits>
 #include <cstring>
+#include <math.h>
+#include <unistd.h>
 
 #include <omp.h>
 
 using namespace std;
-
-#define M_PI 3.14159265
 
 class heat_task {
 public:
@@ -103,9 +103,9 @@ void heat_equation_crank_nicolson(heat_task task, double *v)
 	b_val = -(1 + tao / (h * h));
 
 	{
-		double *a = new double[log2(task.n) + 1];
-		double *b = new double[log2(task.n) + 1];
-		double *c = new double[log2(task.n) + 1];
+		double *a = new double[(int)log2(task.n) + 1];
+		double *b = new double[(int)log2(task.n) + 1];
+		double *c = new double[(int)log2(task.n) + 1];
 		double *right = new double[task.n + 1];
 
 		for (int j = 1; j <= task.m; ++j) {
@@ -140,12 +140,8 @@ int main(int argc, char **argv)
 	double *speedup = new double[max_omp_threads + 1];
 	double *efficiency = new double[max_omp_threads + 1];
 
-	heat_task task(10000, 10000, 1000, 1000);
-	double *v = new double[1001];
-	heat_equation_crank_nicolson(task, v);
-	for (int i = 0; i <= task.n; i++) {
-		cout << v[i] << " ";
-	
+	heat_task task(10000, 10000, 62500, 10000);
+	double *v = new double[62501];
 	
 	omp_set_num_threads(1);
 	start_time[0] = omp_get_wtime();
@@ -161,9 +157,9 @@ int main(int argc, char **argv)
 	for (int i = 1; i < max_omp_threads + 1; i++) {
 		omp_set_num_threads(i);
 		//cout << "Result (parallel " << i <<  " threads):" << endl;
-		
+
 		start_time[i] = omp_get_wtime();
-		
+		heat_equation_crank_nicolson(task, v);
 		diff_time[i] = omp_get_wtime() - start_time[i];
 		speedup[i] = diff_time[0] / diff_time[i];
 		efficiency[i] = speedup[i] / i;
@@ -172,8 +168,6 @@ int main(int argc, char **argv)
 		cout << efficiency[i];
 		cout << endl;
 	}
-
-	getchar();
 
 	return 0;
 }
