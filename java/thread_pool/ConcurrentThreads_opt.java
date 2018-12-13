@@ -11,7 +11,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-public class ConcurrentThreads {
+public class ConcurrentThreads_opt {
 
     private static int NUM_WORKER = Integer.parseInt(System.getProperty("worker","100"));
 
@@ -65,23 +65,36 @@ public class ConcurrentThreads {
 
     private static long doActualWork(final ThreadPoolExecutor service)
             throws InterruptedException, java.util.concurrent.ExecutionException {
-        final List<Future<Long>> ff = new ArrayList<>();
-        for (int i = 0; i < NUM_WORKER; i++) {
-            final Future<Long> f;
-            if (PI) {
-                f = service.submit(new Pi());
-            }
-            else {
-                f = service.submit(new RunRun());
-            }
 
-            ff.add(f);
-        }
-
+        int remain_num_worker = NUM_WORKER;
+        int num_worker_limit = java.lang.Math.min(
+            Runtime.getRuntime().availableProcessors(),
+            service.getPoolSize());
+        int cur_num_worker = java.lang.Math.min(remain_num_worker, num_worker_limit);
         long total = 0;
-        for (final Future<Long> fff : ff) {
-            total += fff.get();
-        }
+
+        do {
+            final List<Future<Long>> ff = new ArrayList<>();
+
+            for (int i = 0; i < cur_num_worker; i++) {
+                final Future<Long> f;
+                if (PI) {
+                    f = service.submit(new Pi());
+                }
+                else {
+                    f = service.submit(new RunRun());
+                }
+
+                ff.add(f);
+            }
+
+            for (final Future<Long> fff : ff) {
+                total += fff.get();
+            }
+            remain_num_worker -= cur_num_worker;
+            cur_num_worker = java.lang.Math.min(remain_num_worker, num_worker_limit);
+        } while (remain_num_worker != 0);
+
         return total;
     }
 
