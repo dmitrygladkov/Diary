@@ -1,1 +1,1 @@
-javac ./ConcurrentThreads.java
+javac ConcurrentThreads.java
