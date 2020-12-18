@@ -13,12 +13,12 @@ LIBS =
 LD = $(CXX)
 LDFLAGS = $(CXXFLAGS)
 
-TESTS = lambda rvalue_move
+TESTS = lambda rvalue_move async
 
 all: $(TESTS)
 
 %: %.cxx
-	$(CXX) $(CXXFLAGS) $< $(LIBS) -o $@
+	$(CXX) $(CXXFLAGS) $< $(LIBS) -o $@ -pthread
 
 clean:
 	-rm -f *.o
