@@ -13,7 +13,7 @@ LIBS =
 LD = $(CXX)
 LDFLAGS = $(CXXFLAGS)
 
-TESTS = lambda rvalue_move async
+TESTS = lambda rvalue_move future
 
 all: $(TESTS)
 
